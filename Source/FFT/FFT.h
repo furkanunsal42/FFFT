@@ -6,9 +6,19 @@
 #include "Texture3D.h"
 #include "Buffer.h"
 
-class FFFT {
-public:
+#include "ComputeProgram.h"
 
+#include <filesystem>
+
+namespace shader_directory {
+	//extern std::filesystem::path ffft2_shader_directory;
+	static std::filesystem::path ffft2_shader_directory = "../FFFT/Source/GLSL/FFT/";
+
+}
+
+class FFFT2 {
+public:
+	
 	enum fft_dimension {
 		x,
 		y,
@@ -20,7 +30,7 @@ public:
 	};
 
 	template<typename T>
-	static constexpr fft_dimension default_fft_dimension();
+	constexpr static fft_dimension default_fft_dimension();
 
 	enum windowing_function {
 		hann,
@@ -30,9 +40,9 @@ public:
 	enum fft_algorithm {
 		fft_dft,
 		fft_radix2_zeropadding,
-		fft_radix2,
+		fft_radix2_dft,
 		fft_radix235_zeropadding,
-		fft_radix235,
+		fft_radix235_dft,
 	};
 
 	enum component {
@@ -50,8 +60,8 @@ public:
 	template<typename T> void copy		(T& source,	T& target, component comp = real_complex, glm::ivec3 offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
 	
 	template<typename T> std::shared_ptr<T> create	(T& source, component comp = real_complex, glm::ivec3 offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
-	template<typename T> std::shared_ptr<T> pad		(T& source, T& target, component comp = real_complex, glm::ivec3 offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
-	template<typename T> std::shared_ptr<T> i_pad	(T& source, T& target, component comp = real_complex, glm::ivec3 offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
+	template<typename T> std::shared_ptr<T> pad		(T& source, component comp = real_complex, glm::vec2 padding_value = glm::vec2(0), glm::ivec3 offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
+	template<typename T> std::shared_ptr<T> i_pad	(T& source, component comp = real_complex, glm::vec2 padding_value = glm::vec2(0), glm::ivec3 offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
 
 	//void window();
 	//void inverse_window();
@@ -61,25 +71,43 @@ public:
 	//void add();
 	//void subtract();
 
-	template<typename T> bool is_complex(T& source);
-	template<typename T> bool is_real(T& source);
+	template<typename T> static bool is_complex(T& source);
+	template<typename T> static bool is_real(T& source);
+	template<typename T> static bool are_same(T& source, T& target);
 
 private:
 
+	enum data_type {
+		buffer,
+		texture1d,
+		texture2d,
+		texture2darray,
+		texture3d,
+	};
 
-	std::vector<std::pair<std::string, std::string>> generate_shader_macros();
-	void compile_shaders();
+	void set_source_type(data_type data_type);
+	void set_source_color_texture_format(Texture2D::ColorTextureFormat color_texture_format);
 
+	void set_target_type(data_type data_type);
+	void set_target_color_texture_format(Texture2D::ColorTextureFormat color_texture_format);
+
+	template<typename T> std::vector<std::pair<std::string, std::string>> generate_shader_macros();
+	template<typename T> void compile_shaders();
+	
 	template<typename T> void dft		(T& source, T& target, fft_dimension dimension = default_fft_dimension<T>(), glm::ivec3 offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
 	template<typename T> void radix2	(T& source, T& target, fft_dimension dimension = default_fft_dimension<T>(), glm::ivec3 offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
 	template<typename T> void radix3	(T& source, T& target, fft_dimension dimension = default_fft_dimension<T>(), glm::ivec3 offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
 	template<typename T> void radix5	(T& source, T& target, fft_dimension dimension = default_fft_dimension<T>(), glm::ivec3 offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
 	
-	struct kernels {
-		std::shared_ptr<ComputeProgram> cp_dft;
-	};
+	bool shaders_are_compiled = false;
+	data_type source_type = texture2d;
+	data_type target_type = texture2d;
+	Texture2D::ColorTextureFormat source_texture_format = Texture2D::ColorTextureFormat::RG16F;
+	Texture2D::ColorTextureFormat target_texture_format = Texture2D::ColorTextureFormat::RG16F;
 
-	std::unordered_map<size_t, kernels> type_to_kernels_table;
+	std::shared_ptr<ComputeProgram> cp_dft_x;
+	std::shared_ptr<ComputeProgram> cp_dft_y;
+	std::shared_ptr<ComputeProgram> cp_dft_z;
 };
 
 #include "FFT_Templated.h"

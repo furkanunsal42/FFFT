@@ -5,18 +5,98 @@
 
 #define axis_x 1
 #define axis_y 2
+#define axis_z 3
 
-#define ffft_complex_format rg32f
-#define ffft_real_format r32f
+#define complex 4
+#define real	5
 
-#define ffft_axis axis_x
+#define ffft_axis			axis_x
 
-layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+#define ffft_source_format	rg32f
+#define ffft_target_format	r32f
 
-layout(ffft_complex_format, binding = 0) uniform image2D fft_read_texture;
-layout(ffft_complex_format, binding = 1) uniform image2D fft_write_texture;
+#define source_image		image2D
+#define target_image		image2D
 
-uniform ivec2 fft_texture_resolution;
+#define source_image_dimensionality 2
+#define target_image_dimensionality 2
+
+#define source_number_type	complex
+#define target_number_type	complex
+
+#if		source_image_dimensionality == 1
+#define source_ivec_type ivec1
+#elif	source_image_dimensionality == 2
+#define source_ivec_type ivec2
+#elif	source_image_dimensionality == 3
+#define source_ivec_type ivec3
+#else
+#error	"invalid source dimensionality"
+#endif
+
+#if		target_image_dimensionality == 1
+#define target_ivec_type ivec1
+#elif	target_image_dimensionality == 2
+#define target_ivec_type ivec2
+#elif	target_image_dimensionality == 3
+#define target_ivec_type ivec3
+#else
+#error	"invalid target dimensionality"
+#endif
+
+
+#if source_image_dimensionality != target_image_dimensionality
+#error "incompatible dimensionality"
+#elif source_image_dimensionality == 1
+	#if		ffft_axis == axis_x
+		#define workgroup_size_x 64
+		#define workgroup_size_y 1
+		#define workgroup_size_z 1
+	#elif	ffft_axis == axis_y
+		#error "incompatible axis and dimensionality"
+	#elif	ffft_axis == axis_z
+		#error "incompatible axis and dimensionality"
+	#endif
+#elif source_image_dimensionality == 2
+	#if		ffft_axis == axis_x
+		#define workgroup_size_x 8
+		#define workgroup_size_y 8
+		#define workgroup_size_z 1
+	#elif	ffft_axis == axis_y
+		#define workgroup_size_x 8
+		#define workgroup_size_y 8
+		#define workgroup_size_z 1
+	#elif	ffft_axis == axis_z
+		#error "incompatible axis and dimensionality"
+	#endif
+#elif source_image_dimensionality == 3
+	#if		ffft_axis == axis_x
+		#define workgroup_size_x 4
+		#define workgroup_size_y 4
+		#define workgroup_size_z 4
+	#elif	ffft_axis == axis_y
+		#define workgroup_size_x 4
+		#define workgroup_size_y 4
+		#define workgroup_size_z 4
+	#elif	ffft_axis == axis_z
+		#define workgroup_size_x 4
+		#define workgroup_size_y 4
+		#define workgroup_size_z 4
+	#endif
+#else
+#error "invalid dimensionality"
+#endif
+
+
+layout (local_size_x = workgroup_size_x, local_size_y = workgroup_size_y, local_size_z = workgroup_size_z) in;
+
+layout(ffft_source_format, binding = 0) uniform source_image fft_read_texture;
+layout(ffft_target_format, binding = 1) uniform target_image fft_write_texture;
+
+uniform ivec3 fft_texture_resolution;
+
+uniform ivec3 fft_texture_offset;
+uniform ivec3 fft_texture_region;
 
 // complex functions
 float cmagnitude(vec2 a){
@@ -63,16 +143,26 @@ vec2 exp_table_dft(int i, int j, int signal_size){
 }
 
 void main(){
-	if (any(greaterThanEqual(id.xy, fft_texture_resolution))) return;
+	ivec3 region_begin	= max(fft_texture_offset, ivec3(0));
+	ivec3 region_end	= min(fft_texture_resolution, fft_texture_offset + fft_texture_region);
+	ivec3 global_id		= ivec3(id) + region_begin;
+	if (any(greaterThanEqual(global_id, region_end)) || any(lessThan(global_id, region_begin))) return;
 	
 	int i;
-	int sample_count;
+	int sample_begin;
+	int sample_end;
 	#if ffft_axis == axis_x
-		i = int(id.x);
-		sample_count = fft_texture_resolution.x;
+		i = global_id.x;
+		sample_begin = region_begin.x;
+		sample_end = region_end.x;
 	#elif ffft_axis == axis_y
-		i = int(id.y);
-		sample_count = fft_texture_resolution.y;
+		i = global_id.y;
+		sample_begin = region_begin.y;
+		sample_end = region_end.y;
+	#elif ffft_axis == axis_z
+		i = global_id.z;
+		sample_begin = region_begin.z;
+		sample_end = region_end.z;
 	#else
 		#error "improper axis defined"
 	#endif
@@ -80,20 +170,31 @@ void main(){
 	float re = 0.0;
 	float im = 0.0;
 	
-	for (int j = 0; j < sample_count; ++j){
+	for (int j = sample_begin; j < sample_end; ++j){
 
-		vec2 signal_j;
+		vec4 signal_j;
 
-		#if ffft_axis == axis_x
-			signal_j = imageLoad(fft_read_texture, ivec2(j, id.y)).xy;
-		#elif ffft_axis == axis_y
-			signal_j = imageLoad(fft_read_texture, ivec2(id.x, j)).xy;
+		#if		ffft_axis == axis_x
+			signal_j = imageLoad(fft_read_texture, source_ivec_type (ivec3(j, global_id.y, global_id.z)));
+		#elif	ffft_axis == axis_y
+			signal_j = imageLoad(fft_read_texture, source_ivec_type (ivec3(global_id.x, j, global_id.z)));
+		#elif	ffft_axis == axis_z
+			signal_j = imageLoad(fft_read_texture, source_ivec_type (ivec3(global_id.x, global_id.y, j)));
 		#endif
 	
-		vec2 cos_sin = exp_table_dft(i, j, sample_count);
-		re += signal_j.r * cos_sin.x - signal_j.g * cos_sin.y;
-		im -= signal_j.r * cos_sin.y + signal_j.g * cos_sin.x;
+		vec2 cos_sin = exp_table_dft(i, j, sample_end - sample_begin);
+		
+		#if		source_number_type == complex
+			re += signal_j.r * cos_sin.x - signal_j.g * cos_sin.y;
+			im -= signal_j.r * cos_sin.y + signal_j.g * cos_sin.x;
+		#elif	source_number_type == real
+			re += signal_j.r * cos_sin.x;
+			im -= signal_j.r * cos_sin.y;
+		#else
+			#error "invalid source_number_type"
+		#endif
+		
 	}
 
-	imageStore(fft_write_texture, ivec2(id.xy), vec4(re, im, 0, 1));
+	imageStore(fft_write_texture, target_ivec_type(ivec3(global_id.xyz)), vec4(re, im, 0, 1));
 }
