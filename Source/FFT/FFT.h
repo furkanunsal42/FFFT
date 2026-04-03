@@ -60,8 +60,9 @@ public:
 	template<typename T> void copy		(T& source,	T& target, component comp = real_complex, glm::ivec3 offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
 	
 	template<typename T> std::shared_ptr<T> create	(T& source, component comp = real_complex, glm::ivec3 offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
-	template<typename T> std::shared_ptr<T> pad		(T& source, component comp = real_complex, glm::vec2 padding_value = glm::vec2(0), glm::ivec3 offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
-	template<typename T> std::shared_ptr<T> i_pad	(T& source, component comp = real_complex, glm::vec2 padding_value = glm::vec2(0), glm::ivec3 offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
+	template<typename T> std::shared_ptr<T> pad		(T& source, component comp = real_complex, glm::ivec3 padding_size = glm::ivec3(0), glm::vec2 padding_value = glm::vec2(0), glm::ivec3 offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
+	template<typename T> void				i_pad	(T& source, T& target, component comp = real_complex, glm::ivec3 padding_size = glm::ivec3(0), glm::ivec3 offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
+	template<typename T> std::shared_ptr<T> i_pad	(T& source, component comp = real_complex, glm::vec2 padding_value = glm::vec2(0), glm::ivec3 padding_size = glm::ivec3(0), glm::ivec3 offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
 
 	//void window();
 	//void inverse_window();
