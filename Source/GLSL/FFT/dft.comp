@@ -1,0 +1,99 @@
+#<compute shader>
+
+#version 460
+#define id gl_GlobalInvocationID
+
+#define axis_x 1
+#define axis_y 2
+
+#define ffft_complex_format rg32f
+#define ffft_real_format r32f
+
+#define ffft_axis axis_x
+
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(ffft_complex_format, binding = 0) uniform image2D fft_read_texture;
+layout(ffft_complex_format, binding = 1) uniform image2D fft_write_texture;
+
+uniform ivec2 fft_texture_resolution;
+
+// complex functions
+float cmagnitude(vec2 a){
+	return (a.x * a.x + a.y * a.y);
+ }
+
+vec2 cadd(vec2 a, vec2 b){
+	return a + b;
+}
+
+vec2 cadd(float a, vec2 b){
+	return a.xx + b;
+}
+
+vec2 cadd(vec2 a, float b){
+	return a + b.xx;
+}
+
+vec2 cmult(vec2 a, vec2 b){
+	return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+}
+
+vec2 cmult(float a, vec2 b){
+	return a.xx * b;
+}
+
+vec2 cmult(vec2 a, float b){
+	return a * b.xx;
+}
+
+vec2 cpolar(float magnitude, float phase){
+	return vec2(cos(phase) * magnitude, sin(phase) * magnitude);
+}
+
+const float PI = 3.14159265358979323846; 
+
+vec2 exp_table(int i, int table_size){
+	return cpolar(1.0, -2 * PI * i / table_size);
+}
+
+vec2 exp_table_dft(int i, int j, int signal_size){
+	float arg = (float(i) * float(j) * PI * 2.0) / signal_size;
+	return vec2 (cos(arg), sin(arg));
+}
+
+void main(){
+	if (any(greaterThanEqual(id.xy, fft_texture_resolution))) return;
+	
+	int i;
+	int sample_count;
+	#if ffft_axis == axis_x
+		i = int(id.x);
+		sample_count = fft_texture_resolution.x;
+	#elif ffft_axis == axis_y
+		i = int(id.y);
+		sample_count = fft_texture_resolution.y;
+	#else
+		#error "improper axis defined"
+	#endif
+	
+	float re = 0.0;
+	float im = 0.0;
+	
+	for (int j = 0; j < sample_count; ++j){
+
+		vec2 signal_j;
+
+		#if ffft_axis == axis_x
+			signal_j = imageLoad(fft_read_texture, ivec2(j, id.y)).xy;
+		#elif ffft_axis == axis_y
+			signal_j = imageLoad(fft_read_texture, ivec2(id.x, j)).xy;
+		#endif
+	
+		vec2 cos_sin = exp_table_dft(i, j, sample_count);
+		re += signal_j.r * cos_sin.x - signal_j.g * cos_sin.y;
+		im -= signal_j.r * cos_sin.y + signal_j.g * cos_sin.x;
+	}
+
+	imageStore(fft_write_texture, ivec2(id.xy), vec4(re, im, 0, 1));
+}
