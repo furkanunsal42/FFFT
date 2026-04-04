@@ -27,3 +27,28 @@ void FFFT2::set_target_color_texture_format(Texture2D::ColorTextureFormat color_
 	shaders_are_compiled = false;
 }
 
+Texture2D::ColorTextureFormat FFFT2::complex_texture_format(Texture2D::ColorTextureFormat real_texture){
+	switch (real_texture) {
+	case Texture2D::ColorTextureFormat::R32F: return Texture2D::ColorTextureFormat::RG32F;
+	case Texture2D::ColorTextureFormat::RG32F: return Texture2D::ColorTextureFormat::RG32F;
+	case Texture2D::ColorTextureFormat::R16F: return Texture2D::ColorTextureFormat::RG16F;
+	case Texture2D::ColorTextureFormat::RG16F: return Texture2D::ColorTextureFormat::RG16F;
+	}
+
+	std::cout << "[FFFT Error] FFFT::complex_texture_format() is called but given original format is not real" << std::endl;
+	ASSERT(false);
+	return Texture2D::ColorTextureFormat::RG16F;
+}
+
+Texture2D::ColorTextureFormat FFFT2::real_texture_format(Texture2D::ColorTextureFormat complex_texture){
+	switch (complex_texture) {
+	case Texture2D::ColorTextureFormat::RG32F: return Texture2D::ColorTextureFormat::R32F;
+	case Texture2D::ColorTextureFormat::R32F: return Texture2D::ColorTextureFormat::R32F;
+	case Texture2D::ColorTextureFormat::RG16F: return Texture2D::ColorTextureFormat::R16F;
+	case Texture2D::ColorTextureFormat::R16F: return Texture2D::ColorTextureFormat::R16F;
+	}
+
+	std::cout << "[FFFT Error] FFFT::real_texture_format() is called but given original format is not complex" << std::endl;
+	ASSERT(false);
+	return Texture2D::ColorTextureFormat::R16F;
+}
