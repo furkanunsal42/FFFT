@@ -74,7 +74,7 @@ public:
 
 	template<typename T> static bool is_complex(T& source);
 	template<typename T> static bool is_real(T& source);
-	template<typename T> static bool are_same(T& source, T& target);
+	template<typename T> static bool is_same(T& source, T& target);
 
 private:
 
@@ -112,59 +112,22 @@ private:
 	std::shared_ptr<ComputeProgram> cp_dft_x;
 	std::shared_ptr<ComputeProgram> cp_dft_y;
 	std::shared_ptr<ComputeProgram> cp_dft_z;
+
+	std::shared_ptr<ComputeProgram> cp_copy_real;
+	std::shared_ptr<ComputeProgram> cp_copy_complex;
+	std::shared_ptr<ComputeProgram> cp_copy_real_complex;
+
 };
 
 #include "FFT_Templated.h"
 
 template<typename T>
-inline bool FFFT2::are_same(T& source, T& target)
-{
-	return source.id == target.id;
-}
-
-namespace {
-	template<typename texture_type, typename vector_type>
-	std::shared_ptr<texture_type> create_texture_glm(vector_type size, Texture2D::ColorTextureFormat format) = delete;
-
-	template<> std::shared_ptr<Texture1D> create_texture_glm(glm::ivec1 size, Texture2D::ColorTextureFormat format) {
-		return std::make_shared<Texture1D>(size.x, format, 1, 0);
-	}
-	template<> std::shared_ptr<Texture2D> create_texture_glm(glm::ivec2 size, Texture2D::ColorTextureFormat format) {
-		return std::make_shared<Texture2D>(size.x, size.y, format, 1, 0);
-	}
-	template<> std::shared_ptr<Texture2DArray> create_texture_glm(glm::ivec3 size, Texture2D::ColorTextureFormat format) {
-		return std::make_shared<Texture2DArray>(size.x, size.y, size.z, format, 1, 0);
-	}
-	template<> std::shared_ptr<Texture3D> create_texture_glm(glm::ivec3 size, Texture2D::ColorTextureFormat format) {
-		return std::make_shared<Texture3D>(size.x, size.y, size.z, format, 1, 0);
-	}
-
-	glm::ivec3 to_ivec3(glm::ivec2 size2) {
-		return glm::ivec3(size2.x, size2.y, 0);
-	}
-
-	glm::ivec3 to_ivec3(glm::ivec1 size1) {
-		return glm::ivec3(size1.x, 0, 0);
-	}
-}
-
-template<typename T>
 inline void FFFT2::copy(T& source, T& target, component comp, glm::ivec3 offset, glm::ivec3 size)
 {
-	
-}
+	if (is_same(source, target)) return;
 
-template<typename T>
-inline std::shared_ptr<T> FFFT2::create(T& source, component comp, glm::ivec3 size)
-{
-	Texture2D::ColorTextureFormat format = source.get_internal_format_color();
-	if (comp == real_complex)	format = complex_texture_format(format);
-	if (comp == real)			format = real_texture_format(format);
-	if (comp == complex)		format = complex_texture_format(format);
+	if (comp == real_complex) {
 
-	if (size.x <= 0) size.x = to_ivec3(source.get_size()).x;
-	if (size.y <= 0) size.y = to_ivec3(source.get_size()).y;
-	if (size.z <= 0) size.z = to_ivec3(source.get_size()).z;
+	}
 
-	return create_texture_glm<T>(source.get_size(), format);
 }
