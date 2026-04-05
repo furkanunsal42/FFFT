@@ -13,7 +13,6 @@
 namespace shader_directory {
 	//extern std::filesystem::path ffft2_shader_directory;
 	static std::filesystem::path ffft2_shader_directory = "../FFFT/Source/GLSL/FFT/";
-
 }
 
 class FFFT2 {
