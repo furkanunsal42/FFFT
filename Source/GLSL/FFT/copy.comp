@@ -3,15 +3,9 @@
 #version 460
 #define id gl_GlobalInvocationID
 
-#define axis_x 1
-#define axis_y 2
-#define axis_z 3
-
 #define complex			4
 #define real			5
 #define real_complex	6
-
-#define ffft_axis			axis_x
 
 #define ffft_source_format	rg32f
 #define ffft_target_format	r32f
@@ -51,62 +45,39 @@
 #if source_image_dimensionality != target_image_dimensionality
 #error "incompatible dimensionality"
 #elif source_image_dimensionality == 1
-	#if		ffft_axis == axis_x
-		#define workgroup_size_x 64
-		#define workgroup_size_y 1
-		#define workgroup_size_z 1
-	#elif	ffft_axis == axis_y
-		#error "incompatible axis and dimensionality"
-	#elif	ffft_axis == axis_z
-		#error "incompatible axis and dimensionality"
-	#endif
+	#define workgroup_size_x 64
+	#define workgroup_size_y 1
+	#define workgroup_size_z 1
 #elif source_image_dimensionality == 2
-	#if		ffft_axis == axis_x
-		#define workgroup_size_x 8
-		#define workgroup_size_y 8
-		#define workgroup_size_z 1
-	#elif	ffft_axis == axis_y
-		#define workgroup_size_x 8
-		#define workgroup_size_y 8
-		#define workgroup_size_z 1
-	#elif	ffft_axis == axis_z
-		#error "incompatible axis and dimensionality"
-	#endif
+	#define workgroup_size_x 8
+	#define workgroup_size_y 8
+	#define workgroup_size_z 1
 #elif source_image_dimensionality == 3
-	#if		ffft_axis == axis_x
-		#define workgroup_size_x 4
-		#define workgroup_size_y 4
-		#define workgroup_size_z 4
-	#elif	ffft_axis == axis_y
-		#define workgroup_size_x 4
-		#define workgroup_size_y 4
-		#define workgroup_size_z 4
-	#elif	ffft_axis == axis_z
-		#define workgroup_size_x 4
-		#define workgroup_size_y 4
-		#define workgroup_size_z 4
-	#endif
+	#define workgroup_size_x 4
+	#define workgroup_size_y 4
+	#define workgroup_size_z 4
 #else
 #error "invalid dimensionality"
 #endif
 
 layout (local_size_x = workgroup_size_x, local_size_y = workgroup_size_y, local_size_z = workgroup_size_z) in;
 
-layout(ffft_source_format, binding = 0) uniform source_image fft_read_texture;
-layout(ffft_target_format, binding = 1) uniform target_image fft_write_texture;
+layout(ffft_source_format, binding = 0) uniform source_image fft_source_texture;
+layout(ffft_target_format, binding = 1) uniform target_image fft_target_texture;
 
-uniform ivec3 fft_texture_resolution;
+uniform ivec3 fft_source_texture_resolution;
+uniform ivec3 fft_target_texture_resolution;
 
-uniform ivec3 fft_texture_read_offset;
-uniform ivec3 fft_texture_write_offset;
+uniform ivec3 fft_texture_source_offset;
+uniform ivec3 fft_texture_target_offset;
 uniform ivec3 fft_texture_region;
 
 void main(){
-	ivec3 region_read_begin	= max(fft_texture_read_offset, ivec3(0));
-	ivec3 region_read_end	= min(fft_texture_resolution, fft_texture_read_offset + fft_texture_region);
+	ivec3 region_read_begin	= max(fft_texture_source_offset, ivec3(0));
+	ivec3 region_read_end	= min(fft_texture_resolution, fft_texture_source_offset + fft_texture_region);
 
-	ivec3 region_write_begin	= max(fft_texture_read_offset, ivec3(0));
-	ivec3 region_write_end		= min(fft_texture_resolution, fft_texture_write_offset + fft_texture_region);
+	ivec3 region_write_begin	= max(fft_texture_source_offset, ivec3(0));
+	ivec3 region_write_end		= min(fft_texture_resolution, fft_texture_target_offset + fft_texture_region);
 
 	ivec3 global_id_read	= ivec3(id) + region_read_begin;
 	ivec3 global_id_write	= ivec3(id) + region_write_begin;
@@ -115,16 +86,16 @@ void main(){
 		any(greaterThanEqual(global_id_write, region_write_end)) || any(lessThan(global_id_write, region_write_begin)) )
 		return;
 	
-	vec4 new_value = imageLoad(fft_read_texture, source_ivec_type (ivec3(global_id_read.xyz)));
+	vec4 new_value = imageLoad(fft_source_texture, source_ivec_type (ivec3(global_id_read.xyz)));
 	
 	#if copy_operation == real
-		vec4 old_value = imageLoad(fft_write_texture, target_ivec_type(ivec3(global_id_write.xyz)));
-		imageStore(fft_write_texture, target_ivec_type(ivec3(global_id_write.xyz)), vec4(new_value.x, old_value.y, 0, 1));
+		vec4 old_value = imageLoad(fft_target_texture, target_ivec_type(ivec3(global_id_write.xyz)));
+		imageStore(fft_target_texture, target_ivec_type(ivec3(global_id_write.xyz)), vec4(new_value.x, old_value.y, 0, 1));
 	#elif copy_operation == complex
-		vec4 old_value = imageLoad(fft_write_texture, target_ivec_type(ivec3(global_id_write.xyz)));
-		imageStore(fft_write_texture, target_ivec_type(ivec3(global_id_write.xyz)), vec4(old_value.x, new_value.y, 0, 1));
+		vec4 old_value = imageLoad(fft_target_texture, target_ivec_type(ivec3(global_id_write.xyz)));
+		imageStore(fft_target_texture, target_ivec_type(ivec3(global_id_write.xyz)), vec4(old_value.x, new_value.y, 0, 1));
 	#elif copy_operation == real_complex
-		imageStore(fft_write_texture, target_ivec_type(ivec3(global_id_write.xyz)), vec4(new_value.x, new_value.y, 0, 1));
+		imageStore(fft_target_texture, target_ivec_type(ivec3(global_id_write.xyz)), vec4(new_value.x, new_value.y, 0, 1));
 	#else
 	#error "invalid copy operation"
 	#endif
