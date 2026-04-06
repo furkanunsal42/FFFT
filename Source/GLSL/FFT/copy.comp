@@ -16,9 +16,6 @@
 #define source_image_dimensionality 2
 #define target_image_dimensionality 2
 
-#define source_number_type	complex
-#define target_number_type	complex
-
 #define copy_operation real_complex
 
 #if		source_image_dimensionality == 1
