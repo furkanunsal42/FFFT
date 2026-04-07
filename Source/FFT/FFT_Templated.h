@@ -36,17 +36,6 @@ template<> inline constexpr FFFT2::fft_dimension FFFT2::default_fft_dimension<Te
 template<> inline constexpr FFFT2::fft_dimension FFFT2::default_fft_dimension<Texture2DArray>()	{ return xyz; }
 template<> inline constexpr FFFT2::fft_dimension FFFT2::default_fft_dimension<Texture3D>()		{ return xyz; }
 
-template<typename T>
-inline bool FFFT2::is_complex(T& source)
-{
-	return source.ColorTextureFormat_channels() == 2 && (source.ColorTextureFormat_to_Type() == Texture3D::Type::HALF_FLOAT || source.ColorTextureFormat_to_Type() == Texture3D::Type::FLOAT);;
-}
-
-template<typename T>
-inline bool FFFT2::is_real(T& source)
-{
-	return source.ColorTextureFormat_channels() == 1 && (source.ColorTextureFormat_to_Type() == Texture3D::Type::HALF_FLOAT || source.ColorTextureFormat_to_Type() == Texture3D::Type::FLOAT);;
-}
 
 template<typename T>
 inline bool FFFT2::is_same(T& source, T& target)
@@ -100,6 +89,8 @@ namespace {
 template<typename T>
 inline std::shared_ptr<T> FFFT2::create(T& source, component comp, glm::ivec3 size)
 {
+	compile_shaders();
+
 	Texture2D::ColorTextureFormat format = source.get_internal_format_color();
 	if (comp == real)			format = real_texture_format(format);
 	if (comp == complex)		format = complex_texture_format(format);
@@ -112,72 +103,12 @@ inline std::shared_ptr<T> FFFT2::create(T& source, component comp, glm::ivec3 si
 	return create_texture_glm<T>(to_ivec3(source.get_size()), format);
 }
 
-template<typename T>
-inline void FFFT2::copy(T& source, T& target, component comp, glm::ivec3 source_offset, glm::ivec3 target_offset,glm::ivec3 size)
-{
-	if (is_same(source, target)) {
-		std::cout << "[FFFT Error] FFFT::copy() is called with identical source and target but self-copy is not supported" << std::endl;
-		ASSERT(false);
-		return;
-	}
-	
-	if (!is_complex(source) && !is_real(source)) {
-		std::cout << "[FFFT Error] FFFT::copy() is called with a source that is neither of real or complex type" << std::endl;
-		ASSERT(false);
-	}
-	
-	if (!is_complex(target) && !is_real(target)) {
-		std::cout << "[FFFT Error] FFFT::copy() is called with a target that is neither of real or complex type" << std::endl;
-		ASSERT(false);
-	}
-
-	if (is_real(source) && is_real(target) && comp == real)
-		comp = real_complex;
-
-	if (is_real(source) && is_real(target) && comp == complex)
-		return;
-
-	if (size.x == 0) size.x = to_ivec3(glm::min(source.get_size(), target.get_size()), 1).x - max(source_offset, target_offset).x;
-	if (size.y == 0) size.y = to_ivec3(glm::min(source.get_size(), target.get_size()), 1).y - max(source_offset, target_offset).y;
-	if (size.z == 0) size.z = to_ivec3(glm::min(source.get_size(), target.get_size()), 1).z - max(source_offset, target_offset).z;
-
-	bool source_overflow = glm::any(glm::greaterThan(source_offset + size, to_ivec3(source.get_size(), 1)));
-	bool target_overflow = glm::any(glm::greaterThan(target_offset + size, to_ivec3(target.get_size(), 1)));
-
-	if (source_overflow || target_overflow) {
-		std::cout << "[FFFT Error] FFFT::copy() is called but specified offset and size exceeds data size" << std::endl;
-		ASSERT(false);
-		return;
-	}
-
-	cp_copy.begin_variant();
-	cp_copy.variant_define("ffft_source_format",	T::ColorTextureFormat_to_OpenGL_compute_Image_format(source.get_internal_format_color()));
-	cp_copy.variant_define("ffft_target_format",	T::ColorTextureFormat_to_OpenGL_compute_Image_format(target.get_internal_format_color()));
-	cp_copy.variant_define("source_image",			T::ColorTextureFormat_to_OpenGL_compute_Image_type(source.get_internal_format_color(), TextureBase2::get_texture_dimention<T>()));
-	cp_copy.variant_define("target_image",			T::ColorTextureFormat_to_OpenGL_compute_Image_type(target.get_internal_format_color(), TextureBase2::get_texture_dimention<T>()));
-	cp_copy.variant_define("source_image_dimensionality",		std::to_string(TextureBase2::get_texture_dimention<T>()));
-	cp_copy.variant_define("target_image_dimensionality",		std::to_string(TextureBase2::get_texture_dimention<T>()));
-
-	cp_copy.variant_define("copy_operation",		component_to_string(comp));
-	
-	ComputeProgram& kernel = *cp_copy.get_current_variant();
-
-	kernel.update_uniform_as_image("fft_source_texture", source, 0);
-	kernel.update_uniform_as_image("fft_target_texture", target, 0);
-
-	kernel.update_uniform("fft_source_texture_resolution", source.get_size());
-	kernel.update_uniform("fft_target_texture_resolution", target.get_size());
-	
-	kernel.update_uniform("fft_texture_source_offset", source_offset);
-	kernel.update_uniform("fft_texture_target_offset", target_offset);
-	kernel.update_uniform("fft_texture_region", size);
-
-	kernel.dispatch_thread(size);
-}
 
 template<typename T>
-inline void FFFT2::pad(T& source, T& target, glm::vec2 padding_value, glm::ivec3 offset)
+inline void FFFT2::pad(T& source, T& target, glm::ivec3 offset, glm::vec2 padding_value)
 {
+	compile_shaders();
+
 	if (glm::any(glm::lessThan(offset, glm::ivec3(0)))) {
 		std::cout << "[FFFT Error] FFFT::pad() is called with an negative offset" << std::endl;
 		ASSERT(false);
@@ -195,6 +126,8 @@ inline void FFFT2::pad(T& source, T& target, glm::vec2 padding_value, glm::ivec3
 template<typename T>
 inline void FFFT2::i_pad(T& source, T& target, glm::ivec3 offset)
 {
+	compile_shaders();
+
 	if (glm::any(glm::lessThan(offset, glm::ivec3(0)))) {
 		std::cout << "[FFFT Error] FFFT::i_pad() is called with an negative offset" << std::endl;
 		ASSERT(false);
@@ -209,17 +142,23 @@ inline void FFFT2::i_pad(T& source, T& target, glm::ivec3 offset)
 }
 
 template<typename T>
-inline std::shared_ptr<T> FFFT2::pad(T& source, glm::vec2 padding_value, glm::ivec3 offset)
+inline std::shared_ptr<T> FFFT2::pad(T& source, glm::ivec3 padded_size, glm::ivec3 offset, glm::vec2 padding_value)
 {
+	compile_shaders();
+
 	if (glm::any(glm::lessThan(offset, glm::ivec3(0)))) {
 		std::cout << "[FFFT Error] FFFT::pad() is called with negative size value" << std::endl;
 		ASSERT(false);
 	}
+	
+	if (glm::any(glm::lessThan(padded_size - offset, to_ivec3(source.get_size())))) {
+		std::cout << "[FFFT Error] FFFT::pad() is called with invalid padded_size and offset values" << std::endl;
+		ASSERT(false);
+	}
 
-	glm::ivec3 final_size = to_ivec3(source.get_size()) + offset;
-	std::shared_ptr<T> target = create_texture_glm<T>(final_size, source.get_internal_format_color());
+	std::shared_ptr<T> target = create_texture_glm<T>(padded_size, source.get_internal_format_color());
 
-	pad(source, *target, padding_value, offset);
+	pad(source, *target, offset, padding_value);
 
 	return target;
 }
@@ -227,6 +166,8 @@ inline std::shared_ptr<T> FFFT2::pad(T& source, glm::vec2 padding_value, glm::iv
 template<typename T>
 inline std::shared_ptr<T> FFFT2::i_pad(T& source, glm::ivec3 offset, glm::ivec3 size)
 {
+	compile_shaders();
+
 	if (glm::any(glm::lessThan(offset, glm::ivec3(0))) || glm::any(glm::lessThan(size, glm::ivec3(0)))) {
 		std::cout << "[FFFT Error] FFFT::i_pad() is called with negative offset or size values" << std::endl;
 		ASSERT(false);
@@ -236,5 +177,77 @@ inline std::shared_ptr<T> FFFT2::i_pad(T& source, glm::ivec3 offset, glm::ivec3 
 
 	i_pad(source, *target, offset);
 
+	return target;
+}
+
+template<typename T>
+inline void FFFT2::shift(T& source, T& target, glm::ivec3 shift_amount)
+{
+	compile_shaders();
+
+	if (source.get_size() != target.get_size()) {
+		std::cout << "[FFFT Error] FFFT::shift() is called but given source and target sizes doesn't match" << std::endl;
+		ASSERT(false);
+	}
+
+	if (is_same(source, target)) {
+		std::cout << "[FFFT Error] FFFT::shift() is called with identical source and target but self-shift is not supported" << std::endl;
+		ASSERT(false);
+		return;
+	}
+
+	if (is_complex(source) && !is_complex(target) || is_real(source) && is_complex(target)) {
+		std::cout << "[FFFT Error] FFFT::shift() is called with unmatching number systems (real vs complex)" << std::endl;
+		ASSERT(false);
+	}
+
+	if (source.get_size() != target.get_size()) {
+		std::cout << "[FFFT Error] FFFT::shift() is called with differently sized source and target" << std::endl;
+		ASSERT(false);
+	}
+
+	cp_shift.begin_variant();
+	cp_shift.variant_define("ffft_source_format",			TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_format(source.get_internal_format_color()));
+	cp_shift.variant_define("ffft_target_format",			TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_format(target.get_internal_format_color()));
+	cp_shift.variant_define("source_image",					TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_type<T>(source.get_internal_format_color()));
+	cp_shift.variant_define("target_image",					TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_type<T>(target.get_internal_format_color()));
+	cp_shift.variant_define("source_image_dimensionality",	std::to_string(TextureBase2::get_texture_dimention<T>()));
+	cp_shift.variant_define("target_image_dimensionality",	std::to_string(TextureBase2::get_texture_dimention<T>()));
+
+	ComputeProgram& kernel = *cp_shift.get_current_variant();
+
+	glm::ivec3 total_size = to_ivec3(source.get_size(), 1);
+
+	kernel.update_uniform_as_image("fft_source_texture", source, 0);
+	kernel.update_uniform_as_image("fft_target_texture", target, 0);
+
+	kernel.update_uniform("fft_texture_resolution", total_size);
+	kernel.update_uniform("fft_shift_amount", shift_amount);
+
+	kernel.dispatch_thread(total_size);
+}
+
+template<typename T>
+inline std::shared_ptr<T> FFFT2::shift(T& source, glm::ivec3 shift_size)
+{
+	compile_shaders();
+	std::shared_ptr<T> target = source.create_texture_with_same_parameters();
+	shift(source, *target, shift_size);
+	return target;
+}
+
+template<typename T>
+inline void FFFT2::i_shift(T& source, T& target, glm::ivec3 shift_size)
+{
+	compile_shaders();
+	shift(source, target, -shift_size);
+}
+
+template<typename T>
+inline std::shared_ptr<T> FFFT2::i_shift(T& source, glm::ivec3 shift_size)
+{
+	compile_shaders();
+	std::shared_ptr<T> target = source.create_texture_with_same_parameters();
+	i_shift(source, *target, shift_size);
 	return target;
 }

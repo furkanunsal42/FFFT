@@ -24,6 +24,8 @@ public:
 	void clear();
 	size_t size() const;
 
+	friend bool operator==(const VariantDefinitions& A, const VariantDefinitions& B);
+
 private:
 	friend VariantedComputeProgram;
 	std::vector<std::pair<std::string, std::string>> definitions;
@@ -38,7 +40,13 @@ namespace std
 				hash<B>{}(p.second);
 		}
 	};
+
+	template<typename A, typename B>
+	inline bool operator==(const std::pair<A, B>& lhs, const std::pair<A, B>& rhs) {
+		return lhs.first == rhs.first && lhs.second == rhs.second;
+	}
 }
+
 
 struct Hash_VariantDefinitions {
 	size_t operator()(const VariantDefinitions& obj) const {
@@ -68,7 +76,7 @@ public:
 
 private:
 
-	std::unordered_map<VariantDefinitions, std::shared_ptr<ComputeProgram>> programs;
+	std::unordered_map<VariantDefinitions, std::shared_ptr<ComputeProgram>, Hash_VariantDefinitions> programs;
 	VariantDefinitions current_macros;
 	std::unique_ptr<Shader> shader = nullptr;
 	size_t maximum_variant_count = 0;

@@ -1,12 +1,12 @@
 #include "VariantedComputeProgram.h"
 
-VariantedComputeProgram::VariantedComputeProgram(size_t maximum_variant_count = 0) : 
+VariantedComputeProgram::VariantedComputeProgram(size_t maximum_variant_count) : 
 	maximum_variant_count(maximum_variant_count)
 {
 		
 }
 
-VariantedComputeProgram::VariantedComputeProgram(Shader shader, size_t maximum_variant_count = 0) : 
+VariantedComputeProgram::VariantedComputeProgram(Shader shader, size_t maximum_variant_count) : 
 	maximum_variant_count(maximum_variant_count), shader(std::make_unique<Shader>(shader))
 {
 	
@@ -38,7 +38,7 @@ std::shared_ptr<ComputeProgram> VariantedComputeProgram::get_current_variant()
 		for (size_t i = 0; i < variant_count_overflow; i++)
 			programs.erase(programs.begin());
 
-		programs[current_macros] = std::make_shared<ComputeProgram>(shader, current_macros.definitions);
+		programs[current_macros] = std::make_shared<ComputeProgram>(*shader, current_macros.definitions);
 	}
 
 	return programs.at(current_macros);
@@ -85,7 +85,11 @@ const std::string& VariantDefinitions::at(const std::string& macro_name) const
 
 VariantDefinitions::const_iterator VariantDefinitions::find(const std::string& macro_name) const
 {
-	return std::find(definitions.begin(), definitions.end(), macro_name);
+	for (size_t i = 0; i < definitions.size(); i++)
+		if (definitions[i].first == macro_name) 
+			return (definitions.begin() + i);
+ 
+	return definitions.end();
 }
 
 VariantDefinitions::const_iterator VariantDefinitions::begin() const{
@@ -104,4 +108,7 @@ size_t VariantDefinitions::size() const {
 	return definitions.size();
 }
 
-
+bool operator==(const VariantDefinitions& A, const VariantDefinitions& B)
+{
+	return A.definitions == B.definitions;
+}

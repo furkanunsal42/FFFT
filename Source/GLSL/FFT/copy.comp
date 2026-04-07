@@ -73,7 +73,7 @@ void main(){
 	ivec3 region_source_begin	= max(fft_texture_source_offset, ivec3(0));
 	ivec3 region_source_end		= min(fft_source_texture_resolution, fft_texture_source_offset + fft_texture_region);
 
-	ivec3 region_target_begin	= max(fft_texture_source_offset, ivec3(0));
+	ivec3 region_target_begin	= max(fft_texture_target_offset, ivec3(0));
 	ivec3 region_target_end		= min(fft_target_texture_resolution, fft_texture_target_offset + fft_texture_region);
 
 	ivec3 global_id_read	= ivec3(id) + region_source_begin;
