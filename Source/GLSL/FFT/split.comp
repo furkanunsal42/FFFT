@@ -16,8 +16,6 @@
 #define source_image_dimensionality 2
 #define target_image_dimensionality 2
 
-#define group_count ivec3(2, 1, 1)
-
 #if		source_image_dimensionality == 1
 #define source_ivec_type ivec1
 #elif	source_image_dimensionality == 2
@@ -68,6 +66,9 @@ uniform ivec3 fft_texture_source_offset;
 uniform ivec3 fft_texture_target_offset;
 uniform ivec3 fft_texture_region;
 
+uniform ivec3 split_count;
+uniform ivec3 split_size;
+
 void main(){
 	ivec3 region_source_begin	= max(fft_texture_source_offset, ivec3(0));
 	ivec3 region_source_end		= min(fft_source_texture_resolution, fft_texture_source_offset + fft_texture_region);
@@ -78,8 +79,13 @@ void main(){
 	ivec3 global_id_read	= ivec3(id) + region_source_begin;
 	
 	ivec3 region_size	= region_source_end - region_source_begin;
+	ivec3 group_count	= region_size / split_size;
 	ivec3 group_size	= region_size / group_count;
-	ivec3 group_id		= (ivec3(id) % group_count);
+
+	//ivec3 group_size	= region_size / group_count;
+	ivec3 group_id		= (ivec3(id) / group_count);
+	ivec3 split_id		= (ivec3(id) % split_count);
+
 	ivec3 write_id		= group_id * group_size + ivec3(id) / group_count;
 	ivec3 global_id_write = write_id + region_target_begin;
 
@@ -88,6 +94,5 @@ void main(){
 		return;
 	
 	vec4 new_value = imageLoad(fft_source_texture, source_ivec_type (ivec3(global_id_read.xyz)));
-	imageStore(fft_target_texture, target_ivec_type(ivec3(global_id_write.xyz)), vec4(new_value.x
-	, new_value.y, 0, 1));
+	imageStore(fft_target_texture, target_ivec_type(ivec3(global_id_write.xyz)), vec4(new_value.x, new_value.y, 0, 1));
 }
