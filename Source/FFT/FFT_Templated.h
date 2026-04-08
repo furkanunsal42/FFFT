@@ -123,12 +123,12 @@ inline void FFFT2::split(T& source, T& target, glm::ivec3 group_count)
 	}
 
 	cp_split.begin_variant();
-	cp_split.variant_define("ffft_source_format", TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_format(source.get_internal_format_color()));
-	cp_split.variant_define("ffft_target_format", TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_format(target.get_internal_format_color()));
-	cp_split.variant_define("source_image", TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_type<T>(source.get_internal_format_color()));
-	cp_split.variant_define("target_image", TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_type<T>(target.get_internal_format_color()));
-	cp_split.variant_define("source_image_dimensionality", std::to_string(TextureBase2::get_texture_dimention<T>()));
-	cp_split.variant_define("target_image_dimensionality", std::to_string(TextureBase2::get_texture_dimention<T>()));
+	cp_split.variant_define("ffft_source_format",			TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_format(source.get_internal_format_color()));
+	cp_split.variant_define("ffft_target_format",			TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_format(target.get_internal_format_color()));
+	cp_split.variant_define("source_image",					TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_type<T>(source.get_internal_format_color()));
+	cp_split.variant_define("target_image",					TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_type<T>(target.get_internal_format_color()));
+	cp_split.variant_define("source_image_dimensionality",	std::to_string(TextureBase2::get_texture_dimention<T>()));
+	cp_split.variant_define("target_image_dimensionality",	std::to_string(TextureBase2::get_texture_dimention<T>()));
 
 	std::string group_count_str = std::string("ivec3(") + std::to_string(group_count.x) + ", " + std::to_string(group_count.y) + ", " + std::to_string(group_count.z) + ")";
 	cp_split.variant_define("group_count", group_count_str);
@@ -144,6 +144,66 @@ inline void FFFT2::split(T& source, T& target, glm::ivec3 group_count)
 	kernel.update_uniform("fft_texture_source_offset", glm::ivec3(0));
 	kernel.update_uniform("fft_texture_target_offset", glm::ivec3(0));
 	kernel.update_uniform("fft_texture_region", to_ivec3(source.get_size(), 1));
+
+	kernel.dispatch_thread(to_ivec3(source.get_size(), 1));
+}
+
+
+template<typename T>
+inline void FFFT2::step(T& source, T& target, size_t radix, fft_dimension dimension, bool inverse)
+{
+	compile_shaders();
+
+	if (is_same(source, target)) {
+		ASSERT(false);
+	}
+
+	if (source.get_size() != target.get_size()) {
+		ASSERT(false);
+	}
+
+	if (source.get_internal_format_color() != target.get_internal_format_color()) {
+		ASSERT(false);
+	}
+
+	if (radix == 0) {
+		ASSERT(false);
+	}
+
+	if (dimension != x && dimension != y && dimension != z) {
+		ASSERT(false);
+	}
+
+	if (
+		(dimension == x && to_ivec3(source.get_size(), 1).x % radix != 0) ||
+		(dimension == y && to_ivec3(source.get_size(), 1).y % radix != 0) ||
+		(dimension == z && to_ivec3(source.get_size(), 1).z % radix != 0)
+		) {
+		ASSERT(false);
+	}
+
+	cp_step.begin_variant();
+	cp_step.variant_define("ffft_source_format",			TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_format(source.get_internal_format_color()));
+	cp_step.variant_define("ffft_target_format",			TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_format(target.get_internal_format_color()));
+	cp_step.variant_define("source_image",					TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_type<T>(source.get_internal_format_color()));
+	cp_step.variant_define("target_image",					TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_type<T>(target.get_internal_format_color()));
+	cp_step.variant_define("source_image_dimensionality",	std::to_string(TextureBase2::get_texture_dimention<T>()));
+	cp_step.variant_define("target_image_dimensionality",	std::to_string(TextureBase2::get_texture_dimention<T>()));
+
+	cp_step.variant_define("radix", std::to_string(radix));
+	cp_step.variant_define("direction", 
+		dimension == x ? "axis_x" :
+		dimension == y ? "axis_y" :
+		dimension == z ? "axis_z" : "axis_x"
+	);
+	cp_step.variant_define("fft_mode", inverse ? "fft_inverse" : "fft_forward");
+
+	ComputeProgram& kernel = *cp_step.get_current_variant();
+
+	kernel.update_uniform_as_image("fft_source_texture", source, 0);
+	kernel.update_uniform_as_image("fft_target_texture", target, 0);
+
+	kernel.update_uniform("fft_texture_resolution", to_ivec3(source.get_size(), 1));
 
 	kernel.dispatch_thread(to_ivec3(source.get_size(), 1));
 }

@@ -101,7 +101,7 @@ public:
 	fft_plan create_plan(size_t array_size, const std::vector<size_t>& supported_radixes = { 25, 16, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2 });
 	
 	template<typename T> void split		(T& source, T& target, glm::ivec3 group_count);
-	template<typename T> void step		(T& source, T& target, int32_t radix, fft_dimension dimension = default_fft_dimension<T>());
+	template<typename T> void step		(T& source, T& target, size_t radix, fft_dimension dimension = default_fft_dimension<T>(), bool inverse = false);
 
 	bool shaders_are_set = false;
 
@@ -109,60 +109,8 @@ public:
 	VariantedComputeProgram cp_shift;
 	VariantedComputeProgram cp_dft;
 	VariantedComputeProgram cp_split;
+	VariantedComputeProgram cp_step;
 
 };
 
 #include "FFT_Templated.h"
-
-template<typename T>
-inline void FFFT2::step(T& source, T& target, int32_t radix, fft_dimension dimension)
-{
-	compile_shaders();
-
-	if (is_same(source, target)) {
-		ASSERT(false);
-	}
-
-	if (source.get_size() != target.get_size()) {
-		ASSERT(false);
-	}
-
-	if (source.get_internal_format_color() != target.get_internal_format_color()) {
-		ASSERT(false);
-	}
-
-	if (glm::any(glm::lessThan(group_count, glm::ivec3(1)))) {
-		ASSERT(false);
-	}
-
-	if (glm::any(glm::notEqual(to_ivec3(source.get_size(), 1) % group_count, glm::ivec3(0)))) {
-		ASSERT(false);
-	}
-
-	cp_split.begin_variant();
-	cp_split.variant_define("ffft_source_format", TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_format(source.get_internal_format_color()));
-	cp_split.variant_define("ffft_target_format", TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_format(target.get_internal_format_color()));
-	cp_split.variant_define("source_image", TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_type<T>(source.get_internal_format_color()));
-	cp_split.variant_define("target_image", TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_type<T>(target.get_internal_format_color()));
-	cp_split.variant_define("source_image_dimensionality", std::to_string(TextureBase2::get_texture_dimention<T>()));
-	cp_split.variant_define("target_image_dimensionality", std::to_string(TextureBase2::get_texture_dimention<T>()));
-
-	std::string group_count_str = std::string("ivec3(") + std::to_string(group_count.x) + ", " + std::to_string(group_count.y) + ", " + std::to_string(group_count.z) + ")";
-	cp_split.variant_define("group_count", group_count_str);
-
-	ComputeProgram& kernel = *cp_split.get_current_variant();
-
-	kernel.update_uniform_as_image("fft_source_texture", source, 0);
-	kernel.update_uniform_as_image("fft_target_texture", target, 0);
-
-	kernel.update_uniform("fft_source_texture_resolution", to_ivec3(source.get_size(), 1));
-	kernel.update_uniform("fft_target_texture_resolution", to_ivec3(target.get_size(), 1));
-
-	kernel.update_uniform("fft_texture_source_offset", glm::ivec3(0));
-	kernel.update_uniform("fft_texture_target_offset", glm::ivec3(0));
-	kernel.update_uniform("fft_texture_region", to_ivec3(source.get_size(), 1));
-
-	kernel.dispatch_thread(to_ivec3(source.get_size(), 1));
-}
-
-
