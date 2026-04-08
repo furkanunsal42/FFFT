@@ -1,0 +1,93 @@
+#<compute shader>
+
+#version 460
+#define id gl_GlobalInvocationID
+
+#define complex			4
+#define real			5
+#define real_complex	6
+
+#define ffft_source_format	rg32f
+#define ffft_target_format	r32f
+
+#define source_image		image2D
+#define target_image		image2D
+
+#define source_image_dimensionality 2
+#define target_image_dimensionality 2
+
+#define group_count ivec3(2, 1, 1)
+
+#if		source_image_dimensionality == 1
+#define source_ivec_type ivec1
+#elif	source_image_dimensionality == 2
+#define source_ivec_type ivec2
+#elif	source_image_dimensionality == 3
+#define source_ivec_type ivec3
+#else
+#error	"invalid source dimensionality"
+#endif
+
+#if		target_image_dimensionality == 1
+#define target_ivec_type ivec1
+#elif	target_image_dimensionality == 2
+#define target_ivec_type ivec2
+#elif	target_image_dimensionality == 3
+#define target_ivec_type ivec3
+#else
+#error	"invalid target dimensionality"
+#endif
+
+#if source_image_dimensionality != target_image_dimensionality
+#error "incompatible dimensionality"
+#elif source_image_dimensionality == 1
+	#define workgroup_size_x 64
+	#define workgroup_size_y 1
+	#define workgroup_size_z 1
+#elif source_image_dimensionality == 2
+	#define workgroup_size_x 8
+	#define workgroup_size_y 8
+	#define workgroup_size_z 1
+#elif source_image_dimensionality == 3
+	#define workgroup_size_x 4
+	#define workgroup_size_y 4
+	#define workgroup_size_z 4
+#else
+#error "invalid dimensionality"
+#endif
+
+layout (local_size_x = workgroup_size_x, local_size_y = workgroup_size_y, local_size_z = workgroup_size_z) in;
+
+layout(ffft_source_format, binding = 0) uniform source_image fft_source_texture;
+layout(ffft_target_format, binding = 1) uniform target_image fft_target_texture;
+
+uniform ivec3 fft_source_texture_resolution;
+uniform ivec3 fft_target_texture_resolution;
+
+uniform ivec3 fft_texture_source_offset;
+uniform ivec3 fft_texture_target_offset;
+uniform ivec3 fft_texture_region;
+
+void main(){
+	ivec3 region_source_begin	= max(fft_texture_source_offset, ivec3(0));
+	ivec3 region_source_end		= min(fft_source_texture_resolution, fft_texture_source_offset + fft_texture_region);
+
+	ivec3 region_target_begin	= max(fft_texture_target_offset, ivec3(0));
+	ivec3 region_target_end		= min(fft_target_texture_resolution, fft_texture_target_offset + fft_texture_region);
+
+	ivec3 global_id_read	= ivec3(id) + region_source_begin;
+	
+	ivec3 region_size	= region_source_end - region_source_begin;
+	ivec3 group_size	= region_size / group_count;
+	ivec3 group_id		= (ivec3(id) % group_count);
+	ivec3 write_id		= group_id * group_size + ivec3(id) / group_count;
+	ivec3 global_id_write = write_id + region_target_begin;
+
+	if (any(greaterThanEqual(global_id_read, region_source_end)) || any(lessThan(global_id_read, region_source_begin)) ||
+		any(greaterThanEqual(global_id_write, region_target_end)) || any(lessThan(global_id_write, region_target_begin)) )
+		return;
+	
+	vec4 new_value = imageLoad(fft_source_texture, source_ivec_type (ivec3(global_id_read.xyz)));
+	imageStore(fft_target_texture, target_ivec_type(ivec3(global_id_write.xyz)), vec4(new_value.x
+	, new_value.y, 0, 1));
+}

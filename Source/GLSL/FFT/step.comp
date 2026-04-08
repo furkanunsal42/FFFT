@@ -1,0 +1,183 @@
+#<compute shader>
+
+#version 460
+#define id gl_GlobalInvocationID
+
+#define complex			4
+#define real			5
+#define real_complex	6
+
+#define axis_x 7
+#define axis_y 8
+#define axis_z 9
+
+#define fft_forward 10
+#define fft_inverse 11
+
+#define ffft_source_format	rg32f
+#define ffft_target_format	r32f
+
+#define source_image		image2D
+#define target_image		image2D
+
+#define source_image_dimensionality 2
+#define target_image_dimensionality 2
+
+#define radix 5
+#define direction axis_x
+#define fft_mode  fft_forward
+
+#if		source_image_dimensionality == 1
+#define source_ivec_type ivec1
+#elif	source_image_dimensionality == 2
+#define source_ivec_type ivec2
+#elif	source_image_dimensionality == 3
+#define source_ivec_type ivec3
+#else
+#error	"invalid source dimensionality"
+#endif
+
+#if		target_image_dimensionality == 1
+#define target_ivec_type ivec1
+#elif	target_image_dimensionality == 2
+#define target_ivec_type ivec2
+#elif	target_image_dimensionality == 3
+#define target_ivec_type ivec3
+#else
+#error	"invalid target dimensionality"
+#endif
+
+#if source_image_dimensionality != target_image_dimensionality
+#error "incompatible dimensionality"
+#elif source_image_dimensionality == 1
+	#define workgroup_size_x 64
+	#define workgroup_size_y 1
+	#define workgroup_size_z 1
+#elif source_image_dimensionality == 2
+	#define workgroup_size_x 8
+	#define workgroup_size_y 8
+	#define workgroup_size_z 1
+#elif source_image_dimensionality == 3
+	#define workgroup_size_x 4
+	#define workgroup_size_y 4
+	#define workgroup_size_z 4
+#else
+#error "invalid dimensionality"
+#endif
+
+layout (local_size_x = workgroup_size_x, local_size_y = workgroup_size_y, local_size_z = workgroup_size_z) in;
+
+layout(ffft_source_format, binding = 0) uniform source_image fft_source_texture;
+layout(ffft_target_format, binding = 1) uniform target_image fft_target_texture;
+
+uniform ivec3 fft_texture_resolution;
+
+//uniform ivec3 fft_texture_source_offset;
+//uniform ivec3 fft_texture_target_offset;
+//uniform ivec3 fft_texture_region;
+
+// complex functions
+float cmagnitude(vec2 a){
+	return (a.x * a.x + a.y * a.y);
+ }
+
+vec2 cadd(vec2 a, vec2 b){
+	return a + b;
+}
+
+vec2 cadd(float a, vec2 b){
+	return a.xx + b;
+}
+
+vec2 cadd(vec2 a, float b){
+	return a + b.xx;
+}
+
+vec2 cmult(vec2 a, vec2 b){
+	return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+}
+
+vec2 cmult(float a, vec2 b){
+	return a.xx * b;
+}
+
+vec2 cmult(vec2 a, float b){
+	return a * b.xx;
+}
+
+vec2 cpolar(float magnitude, float phase){
+	return vec2(cos(phase) * magnitude, sin(phase) * magnitude);
+}
+
+const float PI = 3.14159265358979323846; 
+
+vec2 exp_table(int i, int table_size){
+	return cpolar(1.0, -2 * PI * i / table_size);
+}
+
+vec2 exp_table_dft(int i, int j, int signal_size){
+	float arg = (float(i) * float(j) * PI * 2.0) / signal_size;
+	return vec2 (cos(arg), sin(arg));
+}
+
+int intager_positive_modulo(int a, int b){
+	return ((a % b) + b) % b;
+}
+
+int get_read_write_id(int dispatch_id, int term, int N){
+	return (term * N / radix) + dispatch_id;
+}
+
+ivec3 get_read_write_id_ivec3(ivec3 dispatch_id, int term, ivec3 N){
+	#if direction == axis_x
+		return ivec3(get_read_write_id(dispatch_id.x, term, N.x), dispatch_id.y, dispatch_id.z);
+	#elif direction == axis_y
+		return ivec3(dispatch_id.x, get_read_write_id(dispatch_id.y, term, N.y), dispatch_id.z);
+	#elif direction == axis_z
+		return ivec3(dispatch_id.x, dispatch_id.y, get_read_write_id(dispatch_id.z, term, N.z));
+	#else
+		#error "invalid direction"
+	#endif
+}
+
+void main(){
+	
+	if (any(greaterThanEqual(id, fft_texture_resolution)))
+		return;
+
+	#if direction == axis_x
+		int N = fft_texture_resolution.x;
+		int k = int(id.x);
+	#elif direction == axis_y
+		int N = fft_texture_resolution.y;
+		int k = int(id.y);
+	#elif direction == axis_z
+		int N = fft_texture_resolution.z;
+		int k = int(id.z);
+	#else
+		#error "invalid direction"
+	#endif
+
+	#if fft_mode == fft_forward
+		const float mode_coefficient = -1;
+	#elif fft_mode == fft_inverse
+		const float mode_coefficient = 1;
+	#else 
+		#error "invalid fft_mode"
+	#endif
+	
+	vec2 values[radix];
+	vec2 result[radix];
+
+	for (int i = 0; i < radix; i++)
+		values[i] = imageLoad(fft_source_texture, source_ivec_type(get_read_write_id_ivec3(ivec3(id), i, fft_texture_resolution))).xy;
+
+	for (int term = 0; term < radix; term++){
+		result[term] = values[0];
+		for (int i = 1; i < radix; i++)
+			result[term] += cpolar(1.0, mode_coefficient * 2.0 * PI * (i) * (k + term * N / radix) / N) * values[i];
+	}
+
+	for (int i = 0; i < radix; i++)
+		imageStore(fft_target_texture, target_ivec_type(get_read_write_id_ivec3(ivec3(id), i, fft_texture_resolution)), vec4(result[i], 0, 1));
+}

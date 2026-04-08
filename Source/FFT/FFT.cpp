@@ -1,6 +1,5 @@
 #include "FFT.h"
-
-//std::filesystem::path shader_directory::ffft2_shader_directory = "../FFFT/Source/GLSL/FFT/";
+#include <functional>
 
 std::string FFFT2::component_to_string(component component)
 {
@@ -48,7 +47,37 @@ void FFFT2::compile_shaders() {
 	cp_copy.set_shader(		Shader(shader_directory::ffft2_shader_directory / "copy.comp"));
 	cp_shift.set_shader(	Shader(shader_directory::ffft2_shader_directory / "shift.comp"));
 	cp_dft.set_shader(		Shader(shader_directory::ffft2_shader_directory / "dft.comp"));
+	cp_split.set_shader(	Shader(shader_directory::ffft2_shader_directory / "split.comp"));
 
 	shaders_are_set = true;
 
+}
+
+FFFT2::fft_plan FFFT2::create_plan(size_t array_size, const std::vector<size_t>& supported_radixes)
+{
+	fft_plan plan;
+
+	do {
+		fft_iteration iteration;
+
+		size_t found_radix = fft_iteration::radix_dft;
+
+		for (size_t radix : supported_radixes) {
+			if (array_size % radix == 0) {
+				found_radix = radix;
+				array_size /= radix;
+				break;
+			}
+		}
+
+		iteration.radix = found_radix;
+		iteration.chunk_size = array_size;
+		plan.iterations.push_back(iteration);
+		
+		if (iteration.chunk_size == 1 || found_radix == fft_iteration::radix_dft)
+			break;
+		
+	} while (true);
+
+	return plan;
 }
