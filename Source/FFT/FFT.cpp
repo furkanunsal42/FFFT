@@ -81,3 +81,36 @@ FFFT2::fft_plan FFFT2::create_plan(size_t array_size, const std::vector<size_t>&
 
 	return plan;
 }
+
+FFFT2::fft_plan FFFT2::create_plan(size_t array_size, size_t supported_max_radix, size_t supported_min_radix)
+{
+	if (supported_max_radix < supported_min_radix) {
+		ASSERT(false);
+	}
+
+	fft_plan plan;
+
+	do {
+		fft_iteration iteration;
+
+		size_t found_radix = fft_iteration::radix_dft;
+
+		for (size_t radix = supported_max_radix; radix >= supported_min_radix; radix--) {
+			if (array_size % radix == 0) {
+				found_radix = radix;
+				array_size /= radix;
+				break;
+			}
+		}
+
+		iteration.radix = found_radix;
+		iteration.chunk_size = array_size;
+		plan.iterations.push_back(iteration);
+
+		if (iteration.chunk_size == 1 || found_radix == fft_iteration::radix_dft)
+			break;
+
+	} while (true);
+
+	return plan;
+}
