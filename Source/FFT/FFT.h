@@ -102,6 +102,7 @@ public:
 	
 	template<typename T> void split		(T& source, T& target, glm::ivec3 split_count, glm::ivec3 group_count = glm::ivec3(1));
 	template<typename T> void step		(T& source, T& target, size_t radix, fft_dimension dimension = default_fft_dimension<T>(), bool inverse = false);
+	template<typename T> void dft		(T& source, T& target, fft_dimension dimension = default_fft_dimension<T>(), bool inverse = false);
 
 	bool shaders_are_set = false;
 

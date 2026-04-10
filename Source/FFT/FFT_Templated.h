@@ -100,6 +100,13 @@ namespace {
 template<typename T>
 inline void FFFT2::split(T& source, T& target, glm::ivec3 split_count, glm::ivec3 group_count)
 {
+	if (is_same(source, target)) {
+		std::shared_ptr<T> texture = source.create_texture_with_same_parameters();
+		copy(source, texture, real_complex);
+		split(texture, source, split_count, group_count);
+		return;
+	}
+
 	compile_shaders();
 
 	if (is_same(source, target)) {
@@ -157,6 +164,11 @@ inline void FFFT2::step(T& source, T& target, size_t radix, fft_dimension dimens
 {
 	compile_shaders();
 
+	if (radix == fft_iteration::radix_dft) {
+		dft(source, target, dimension, inverse);
+		return;
+	}
+
 	if (is_same(source, target)) {
 		ASSERT(false);
 	}
@@ -209,6 +221,12 @@ inline void FFFT2::step(T& source, T& target, size_t radix, fft_dimension dimens
 	kernel.update_uniform("fft_texture_resolution", to_ivec3(source.get_size(), 1));
 
 	kernel.dispatch_thread(to_ivec3(source.get_size(), 1));
+}
+
+template<typename T>
+inline void FFFT2::dft(T& source, T& target, fft_dimension dimension, bool inverse)
+{
+
 }
 
 template<typename T>
@@ -373,6 +391,12 @@ inline std::shared_ptr<T> FFFT2::i_pad(T& source, glm::ivec3 offset, glm::ivec3 
 template<typename T>
 inline void FFFT2::shift(T& source, T& target, glm::ivec3 shift_amount)
 {
+	if (is_same(source, target)) {
+		std::shared_ptr<T> texture = shift(source, shift_amount);
+		copy(texture, source, real_complex);
+		return;
+	}
+
 	compile_shaders();
 
 	if (source.get_size() != target.get_size()) {

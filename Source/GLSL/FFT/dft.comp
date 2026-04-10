@@ -98,6 +98,8 @@ uniform ivec3 fft_texture_resolution;
 uniform ivec3 fft_texture_offset;
 uniform ivec3 fft_texture_region;
 
+uniform ivec3 group_count;
+
 // complex functions
 float cmagnitude(vec2 a){
 	return (a.x * a.x + a.y * a.y);
