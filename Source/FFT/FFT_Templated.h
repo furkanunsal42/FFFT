@@ -98,7 +98,7 @@ namespace {
 }
 
 template<typename T>
-inline void FFFT2::split(T& source, T& target, glm::ivec3 group_count)
+inline void FFFT2::split(T& source, T& target, glm::ivec3 split_count, glm::ivec3 group_count)
 {
 	compile_shaders();
 
@@ -130,8 +130,8 @@ inline void FFFT2::split(T& source, T& target, glm::ivec3 group_count)
 	cp_split.variant_define("source_image_dimensionality",	std::to_string(TextureBase2::get_texture_dimention<T>()));
 	cp_split.variant_define("target_image_dimensionality",	std::to_string(TextureBase2::get_texture_dimention<T>()));
 
-	std::string group_count_str = std::string("ivec3(") + std::to_string(group_count.x) + ", " + std::to_string(group_count.y) + ", " + std::to_string(group_count.z) + ")";
-	cp_split.variant_define("group_count", group_count_str);
+	//std::string group_count_str = std::string("ivec3(") + std::to_string(group_count.x) + ", " + std::to_string(group_count.y) + ", " + std::to_string(group_count.z) + ")";
+	//cp_split.variant_define("group_count", group_count_str);
 
 	ComputeProgram& kernel = *cp_split.get_current_variant();
 
@@ -144,6 +144,9 @@ inline void FFFT2::split(T& source, T& target, glm::ivec3 group_count)
 	kernel.update_uniform("fft_texture_source_offset", glm::ivec3(0));
 	kernel.update_uniform("fft_texture_target_offset", glm::ivec3(0));
 	kernel.update_uniform("fft_texture_region", to_ivec3(source.get_size(), 1));
+
+	kernel.update_uniform("group_count", group_count);
+	kernel.update_uniform("split_count", split_count);
 
 	kernel.dispatch_thread(to_ivec3(source.get_size(), 1));
 }

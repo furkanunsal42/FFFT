@@ -100,7 +100,7 @@ public:
 	fft_plan create_plan(size_t array_size, size_t supported_max_radix, size_t supported_min_radix = fft_iteration::radix_dft);
 	fft_plan create_plan(size_t array_size, const std::vector<size_t>& supported_radixes = { 25, 16, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2 });
 	
-	template<typename T> void split		(T& source, T& target, glm::ivec3 group_count);
+	template<typename T> void split		(T& source, T& target, glm::ivec3 split_count, glm::ivec3 group_count = glm::ivec3(1));
 	template<typename T> void step		(T& source, T& target, size_t radix, fft_dimension dimension = default_fft_dimension<T>(), bool inverse = false);
 
 	bool shaders_are_set = false;
