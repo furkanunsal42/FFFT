@@ -247,7 +247,12 @@ inline void FFFT2::step(T& source, T& target, size_t radix, fft_dimension dimens
 	kernel.update_uniform("fft_texture_resolution", to_ivec3(source.get_size(), 1));
 	kernel.update_uniform("group_count", group_count);
 
-	kernel.dispatch_thread(to_ivec3(source.get_size(), 1));
+	glm::ivec3 dispatch_size = to_ivec3(source.get_size(), 1);
+	if (dimension == x) dispatch_size.x /= radix;
+	if (dimension == y) dispatch_size.y /= radix;
+	if (dimension == z) dispatch_size.z /= radix;
+
+	kernel.dispatch_thread(dispatch_size);
 }
 
 template<typename T>

@@ -129,59 +129,66 @@ int intager_positive_modulo(int a, int b){
 	return ((a % b) + b) % b;
 }
 
-void main(){
+void main() {
     ivec3 res = fft_texture_resolution;
+    // Bounds check: since we dispatch 1/radix threads, 
+    // ensure we don't read/write out of bounds
     if (any(greaterThanEqual(id, res))) return;
-
-    // N is the span of the current sub-transform (e.g., 5, 25, 125...)
-    // group_count tells us how many of these sub-transforms fit in the axis.
+    
+    // N is the span of the current sub-transform
     ivec3 sub_transform_size = res / group_count;
 
     #if direction == axis_x
         int N = sub_transform_size.x;
-        int global_pos = int(id.x);
+        int sub_n = N / radix; 
+        // We divide the id by radix because one thread handles a whole group
+        int k = int(id.x) % sub_n; 
+        int block_start = (int(id.x) / sub_n) * N;
     #elif direction == axis_y
         int N = sub_transform_size.y;
-        int global_pos = int(id.y);
+        int sub_n = N / radix;
+        int k = int(id.y) % sub_n;
+        int block_start = (int(id.y) / sub_n) * N;
     #endif
 
-    // Logic:
-    // 1. Where are we in the current butterfly? (k)
-    // 2. Which 'frequency bin' (term) of the butterfly is this thread?
-    // 3. Where does the whole butterfly block start in the image?
-    
-    int sub_n = N / radix;             // The distance between butterfly elements
-    int k = global_pos % sub_n;        // Index within the sub-group
-    int term = (global_pos / sub_n) % radix; // 0, 1, 2, 3, or 4
-    int block_start = (global_pos / N) * N;  // Start of this specific N-sized transform
-
-    vec2 sum = vec2(0.0);
-
+    // 1. Load all inputs into registers once
+    vec2 butterfly_elements[radix];
     for (int i = 0; i < radix; i++) {
-        // Read the i-th input for this butterfly
         int read_idx = block_start + k + (i * sub_n);
-        
         ivec3 read_pos = ivec3(id);
         #if direction == axis_x
             read_pos.x = read_idx;
         #elif direction == axis_y
             read_pos.y = read_idx;
         #endif
-
-        vec2 val = imageLoad(fft_source_texture, source_ivec_type(read_pos)).xy;
-
-        // Twiddle Logic:
-        // 'i' is the input branch (0..4)
-        // 'term' is the output branch (0..4)
-        // 'k' is the offset within the sub-transform
-        //float angle = mode_coefficient * 2.0 * PI * float(i) * (float(term) * float(sub_n) + float(k)) / float(N);
         
-        float phase_dft = (float(i) * float(term)) / float(radix);
-        float phase_twiddle = (float(i) * float(k)) / float(N);
-        float angle = mode_coefficient * 2.0 * PI * (phase_dft + phase_twiddle);
-
-        sum += cmult(val, vec2(cos(angle), sin(angle)));
+        // Load and apply the "Outer" twiddle factor immediately
+        vec2 val = imageLoad(fft_source_texture, source_ivec_type(read_pos)).xy;
+        float twiddle_angle = mode_coefficient * 2.0 * PI * float(i * k) / float(N);
+        butterfly_elements[i] = cmult(val, vec2(cos(twiddle_angle), sin(twiddle_angle)));
     }
 
-    imageStore(fft_target_texture, target_ivec_type(id), vec4(sum, 0, 1));
+    // 2. Compute the Small DFT (The Kernel)
+    vec2 results[radix];
+    for (int term = 0; term < radix; term++) {
+        vec2 sum = vec2(0.0);
+        for (int i = 0; i < radix; i++) {
+            // Internal Radix-DFT rotation
+            float dft_angle = mode_coefficient * 2.0 * PI * float(i * term) / float(radix);
+            sum += cmult(butterfly_elements[i], vec2(cos(dft_angle), sin(dft_angle)));
+        }
+        results[term] = sum;
+    }
+
+    // 3. Store all results
+    for (int term = 0; term < radix; term++) {
+        int write_idx = block_start + k + (term * sub_n);
+        ivec3 write_pos = ivec3(id);
+        #if direction == axis_x
+            write_pos.x = write_idx;
+        #elif direction == axis_y
+            write_pos.y = write_idx;
+        #endif
+        imageStore(fft_target_texture, target_ivec_type(write_pos), vec4(results[term], 0.0, 1.0));
+    }
 }
