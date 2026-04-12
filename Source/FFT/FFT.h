@@ -90,8 +90,8 @@ public:
 
 	struct fft_iteration {
 		constexpr static size_t radix_dft = 1;
-		size_t	radix = radix_dft;
-		size_t	chunk_size = 0;
+		size_t	radix		= radix_dft;
+		size_t	chunk_size	= 0;
 	};
 
 	struct fft_plan {

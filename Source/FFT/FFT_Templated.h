@@ -1,35 +1,6 @@
 #pragma once
 #include "FFT.h"
 
-//template<typename T>
-//inline void FFFT2::fft(T& source, T& target, fft_dimension dimension, fft_algorithm algorithm, glm::ivec3 offset, glm::ivec3 size)
-//{
-//	dft(source, target, dimension, offset, size);
-//}
-
-//template<typename T>
-//inline void FFFT2::dft(T& source, T& target, fft_dimension dimension, glm::ivec3 offset, glm::ivec3 size)
-//{
-//	if (dimension != x && dimension != y && dimension != z) {
-//		std::cout << "[FFFT Error] void dft() is called with invalid dimension" << std::endl;
-//		ASSERT(false);
-//	}
-//
-//	ComputeProgram& kernel =
-//		dimension == x ? *cp_dft_x :
-//		dimension == y ? *cp_dft_y :
-//		dimension == z ? *cp_dft_z : *cp_dft_x;
-//
-//	kernel.update_uniform_as_image("fft_read_texture", source, 0);
-//	kernel.update_uniform_as_image("fft_write_texture", target, 0);
-//
-//	kernel.update_uniform("fft_texture_resolution", source.size());
-//	kernel.update_uniform("fft_texture_offset", offset);
-//	kernel.update_uniform("fft_texture_region", size);
-//
-//	kernel.dispatch_thread(size);
-//}
-
 template<> inline constexpr FFFT2::fft_dimension FFFT2::default_fft_dimension<Buffer>()			{ return x; }
 template<> inline constexpr FFFT2::fft_dimension FFFT2::default_fft_dimension<Texture1D>()		{ return x; }
 template<> inline constexpr FFFT2::fft_dimension FFFT2::default_fft_dimension<Texture2D>()		{ return xy; }
@@ -53,7 +24,6 @@ inline bool FFFT2::is_same(T& source, T& target)
 {
 	return source.id == target.id;
 }
-
 
 namespace {
 
@@ -161,8 +131,8 @@ inline void FFFT2::split(T& source, T& target, glm::ivec3 split_count, glm::ivec
 {
 	if (is_same(source, target)) {
 		std::shared_ptr<T> texture = source.create_texture_with_same_parameters();
-		copy(source, texture, real_complex);
-		split(texture, source, split_count, group_count);
+		copy(source, *texture, real_complex);
+		split(*texture, source, split_count, group_count);
 		return;
 	}
 
@@ -596,12 +566,36 @@ void FFFT2::fft(T& source, T& target, fft_dimension dimension, fft_algorithm alg
 		if (dimension & y) { dft(*source_p, *target_p, y); std::swap(source_p, target_p); };
 		if (dimension & z) { dft(*source_p, *target_p, z); std::swap(source_p, target_p); };
 
-		if (target_p != &target) {
+		if (target_p != &target)
 			copy(source, target, real_complex);
-		}
+		return;
 	}
 
-	fft_plan plan = create_plan(source.get_size().x);
+	if (algorithm == FFFT2::fft_radix2_dft) {
+		T* source_p = &source;
+		T* target_p = &target;
+		
+		glm::ivec3 group_count	= glm::ivec3(1);
+		glm::ivec3 split_count	= glm::ivec3(2, 1, 1);
+		int32_t counter = 0;
+		while (group_count.x < source.get_size().x) {
+			split(*source_p, *target_p, split_count, group_count);
+			std::swap(source_p, target_p);
+			group_count *= split_count;
+			counter++;
+		}
+
+		for (int32_t i = 0; i < counter; i++) {
+		//while(group_count.x >= 1) {
+			step(*source_p, *target_p, 2, x, false, group_count);
+			group_count.x /= 2;
+			std::swap(source_p, target_p);
+		}
+
+		if (target_p != &target)
+			copy(source, target, real_complex);
+		return;
+	}
 }
 
 template<typename T>

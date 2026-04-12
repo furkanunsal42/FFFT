@@ -129,46 +129,59 @@ int intager_positive_modulo(int a, int b){
 	return ((a % b) + b) % b;
 }
 
-int get_read_write_id(int dispatch_id, int term, int N){
-	return (term * N / radix) + dispatch_id % N + (dispatch_id / N) * N;
-}
-
-ivec3 get_read_write_id_ivec3(ivec3 dispatch_id, int term, ivec3 N){
-	#if direction == axis_x
-		return ivec3(get_read_write_id(dispatch_id.x, term, N.x), dispatch_id.y, dispatch_id.z);
-	#elif direction == axis_y
-		return ivec3(dispatch_id.x, get_read_write_id(dispatch_id.y, term, N.y), dispatch_id.z);
-	#elif direction == axis_z
-		return ivec3(dispatch_id.x, dispatch_id.y, get_read_write_id(dispatch_id.z, term, N.z));
-	#else
-		#error "invalid direction"
-	#endif
-}
-
 void main(){
-	
-	if (any(greaterThanEqual(id, fft_texture_resolution)))
-		return;
+    ivec3 res = fft_texture_resolution;
+    if (any(greaterThanEqual(id, res))) return;
 
-	ivec3 group_size = fft_texture_resolution / group_count;
+    // N is the span of the current sub-transform (e.g., 5, 25, 125...)
+    // group_count tells us how many of these sub-transforms fit in the axis.
+    ivec3 sub_transform_size = res / group_count;
 
-	#if direction == axis_x
-		int N = group_size.x;
-		int k = int(id.x) % group_size.x;
-	#elif direction == axis_y
-		int N = group_size.y;
-		int k = int(id.y) % group_size.y;
-	#elif direction == axis_z
-		int N = group_size.z;
-		int k = int(id.z) % group_size.z;
-	#else
-		#error "invalid direction"
-	#endif
+    #if direction == axis_x
+        int N = sub_transform_size.x;
+        int global_pos = int(id.x);
+    #elif direction == axis_y
+        int N = sub_transform_size.y;
+        int global_pos = int(id.y);
+    #endif
 
-	for (int term = 0; term < radix; term++){
-		vec2 result = imageLoad(fft_source_texture, source_ivec_type(get_read_write_id_ivec3(ivec3(id), 0, group_size))).xy;
-		for (int i = 1; i < radix; i++)
-			result += cpolar(1.0, mode_coefficient * 2.0 * PI * (i) * (k + term * N / radix) / N) * imageLoad(fft_source_texture, source_ivec_type(get_read_write_id_ivec3(ivec3(id), i, group_size))).xy;
-		imageStore(fft_target_texture, target_ivec_type(get_read_write_id_ivec3(ivec3(id), term, group_size)), vec4(result, 0, 1));
-	}
+    // Logic:
+    // 1. Where are we in the current butterfly? (k)
+    // 2. Which 'frequency bin' (term) of the butterfly is this thread?
+    // 3. Where does the whole butterfly block start in the image?
+    
+    int sub_n = N / radix;             // The distance between butterfly elements
+    int k = global_pos % sub_n;        // Index within the sub-group
+    int term = (global_pos / sub_n) % radix; // 0, 1, 2, 3, or 4
+    int block_start = (global_pos / N) * N;  // Start of this specific N-sized transform
+
+    vec2 sum = vec2(0.0);
+
+    for (int i = 0; i < radix; i++) {
+        // Read the i-th input for this butterfly
+        int read_idx = block_start + k + (i * sub_n);
+        
+        ivec3 read_pos = ivec3(id);
+        #if direction == axis_x
+            read_pos.x = read_idx;
+        #elif direction == axis_y
+            read_pos.y = read_idx;
+        #endif
+
+        vec2 val = imageLoad(fft_source_texture, source_ivec_type(read_pos)).xy;
+
+        // Twiddle Logic:
+        // 'i' is the input branch (0..4)
+        // 'term' is the output branch (0..4)
+        // 'k' is the offset within the sub-transform
+        //float angle = mode_coefficient * 2.0 * PI * float(i) * (float(term) * float(sub_n) + float(k)) / float(N);
+        
+        float phase_dft = (float(i) * float(term)) / float(radix);
+        float phase_twiddle = (float(i) * float(k)) / float(N);
+        float angle = mode_coefficient * 2.0 * PI * (phase_dft + phase_twiddle);
+
+        sum += cmult(val, vec2(cos(angle), sin(angle)));
+    }
+
+    imageStore(fft_target_texture, target_ivec_type(id), vec4(sum, 0, 1));
 }

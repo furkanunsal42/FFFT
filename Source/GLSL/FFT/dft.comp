@@ -143,12 +143,12 @@ vec2 cpolar(float magnitude, float phase){
 
 const float PI = 3.14159265358979323846; 
 
-vec2 exp_table(int i, int table_size){
-	return cpolar(1.0, mode_coefficient * 2 * PI * i / table_size);
-}
+//vec2 exp_table(int i, int table_size){
+//	return cpolar(1.0, mode_coefficient * 2 * PI * i / table_size);
+//}
 
 vec2 exp_table_dft(int i, int j, int signal_size){
-	float arg = (float(i) * float(j) * PI * 2.0 * mode_coefficient) / signal_size;
+	float arg = (float(i % signal_size) * float(j % signal_size) * PI * 2.0 * mode_coefficient) / signal_size;
 	return vec2 (cos(arg), sin(arg));
 }
 
@@ -164,8 +164,8 @@ void main(){
 	int sample_end;
 	#if direction == axis_x
 		i				= global_id.x;
-		sample_begin	= 0;
-		sample_end		= fft_texture_resolution.x;
+		sample_begin	= group_id.x * group_size.x;
+		sample_end		= min((group_id.x+1) * group_size.x, fft_texture_resolution.x);
 	#elif direction == axis_y
 		i				= global_id.y;
 		sample_begin	= 0;
@@ -193,7 +193,7 @@ void main(){
 			signal_j = imageLoad(fft_source_texture, source_ivec_type (ivec3(global_id.x, global_id.y, j)));
 		#endif
 	
-		vec2 cos_sin = exp_table_dft(i, j, sample_end - sample_begin);
+		vec2 cos_sin = exp_table_dft(i , j, sample_end - sample_begin);
 		
 		#if		source_number_type == complex
 			re += signal_j.r * cos_sin.x - signal_j.g * cos_sin.y;
