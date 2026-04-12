@@ -8,13 +8,13 @@
 #define real_complex	6
 
 #define ffft_source_format	rg32f
-#define ffft_target_format	r32f
 
 #define source_image		image2D
-#define target_image		image2D
 
 #define source_image_dimensionality 2
-#define target_image_dimensionality 2
+
+#define def uniform vec4 constant;
+#define op 	value.xy += constant.xy
 
 #if		source_image_dimensionality == 1
 #define source_ivec_type ivec1
@@ -26,20 +26,7 @@
 #error	"invalid source dimensionality"
 #endif
 
-#if		target_image_dimensionality == 1
-#define target_ivec_type ivec1
-#elif	target_image_dimensionality == 2
-#define target_ivec_type ivec2
-#elif	target_image_dimensionality == 3
-#define target_ivec_type ivec3
-#else
-#error	"invalid target dimensionality"
-#endif
-
-
-#if source_image_dimensionality != target_image_dimensionality
-#error "incompatible dimensionality"
-#elif source_image_dimensionality == 1
+#if source_image_dimensionality == 1
 	#define workgroup_size_x 64
 	#define workgroup_size_y 1
 	#define workgroup_size_z 1
@@ -58,23 +45,18 @@
 layout (local_size_x = workgroup_size_x, local_size_y = workgroup_size_y, local_size_z = workgroup_size_z) in;
 
 layout(ffft_source_format, binding = 0) uniform source_image fft_source_texture;
-layout(ffft_target_format, binding = 1) uniform target_image fft_target_texture;
 
 uniform ivec3 fft_texture_resolution;
-uniform ivec3 fft_shift_amount;
 
-ivec3 intager_positive_mod(ivec3 a, ivec3 b){
-	return (((a + b) % b) + b) % b;
-	//return ivec3(round(mod(a, b)));
-}
+//uniform vec4 constant;
+def
 
 void main(){
-	
-	if (any(greaterThanEqual(ivec3(id), fft_texture_resolution)))
+	ivec3 global_id	= ivec3(id);
+	if (any(greaterThanEqual(global_id, fft_texture_resolution)))
 		return;
 	
-	ivec3 read_location = ivec3(intager_positive_mod((ivec3(id)) - fft_shift_amount, fft_texture_resolution));
-	
-	vec4 shifted_value = imageLoad(fft_source_texture, source_ivec_type (ivec3(read_location)));
-	imageStore(fft_target_texture, target_ivec_type(ivec3(id.xyz)), shifted_value);
+	vec4 value = imageLoad(fft_source_texture, source_ivec_type (ivec3(global_id.xyz)));
+	op;
+	imageStore(fft_source_texture, source_ivec_type(ivec3(global_id.xyz)), value);
 }

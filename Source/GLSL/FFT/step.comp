@@ -27,6 +27,14 @@
 #define direction axis_x
 #define fft_mode  fft_forward
 
+#if fft_mode == fft_forward
+	const float mode_coefficient = -1;
+#elif fft_mode == fft_inverse
+	const float mode_coefficient = 1;
+#else 
+	#error "invalid fft_mode"
+#endif
+
 #if		source_image_dimensionality == 1
 #define source_ivec_type ivec1
 #elif	source_image_dimensionality == 2
@@ -71,7 +79,7 @@ layout(ffft_source_format, binding = 0) uniform source_image fft_source_texture;
 layout(ffft_target_format, binding = 1) uniform target_image fft_target_texture;
 
 uniform ivec3 fft_texture_resolution;
-uniform ivec3 group_size;
+uniform ivec3 group_count;
 
 // complex functions
 float cmagnitude(vec2 a){
@@ -142,6 +150,8 @@ void main(){
 	if (any(greaterThanEqual(id, fft_texture_resolution)))
 		return;
 
+	ivec3 group_size = fft_texture_resolution / group_count;
+
 	#if direction == axis_x
 		int N = group_size.x;
 		int k = int(id.x) % group_size.x;
@@ -155,14 +165,6 @@ void main(){
 		#error "invalid direction"
 	#endif
 
-	#if fft_mode == fft_forward
-		const float mode_coefficient = -1;
-	#elif fft_mode == fft_inverse
-		const float mode_coefficient = 1;
-	#else 
-		#error "invalid fft_mode"
-	#endif
-	
 	for (int term = 0; term < radix; term++){
 		vec2 result = imageLoad(fft_source_texture, source_ivec_type(get_read_write_id_ivec3(ivec3(id), 0, group_size))).xy;
 		for (int i = 1; i < radix; i++)

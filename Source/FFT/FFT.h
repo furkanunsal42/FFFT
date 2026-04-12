@@ -19,13 +19,13 @@ class FFFT2 {
 public:
 	
 	enum fft_dimension {
-		x,
-		y,
-		z,
-		xy,
-		yz,
-		xz,
-		xyz,
+		x	= 0b001,
+		y	= 0b010,
+		z	= 0b100,
+		xy	= x | y,
+		yz	= y | z,
+		xz	= x | y,
+		xyz = x | y | z,
 	};
 
 	template<typename T>
@@ -66,13 +66,14 @@ public:
 	template<typename T> std::shared_ptr<T> pad		(T& source, glm::ivec3 padded_size, glm::ivec3 offset = glm::ivec3(0), glm::vec2 padding_value = glm::vec2(0));
 	template<typename T> std::shared_ptr<T> i_pad	(T& source, glm::ivec3 offset, glm::ivec3 size);
 
+	template<typename T> void				op			(T& source, glm::vec4 constant, std::string operation, std::string additional_definition = "");
+	template<typename T> void				conjugate	(T& source);
+	template<typename T> void				multiply	(T& source, glm::vec2 constant);
+	template<typename T> void				divide		(T& source, glm::vec2 constant);
+	template<typename T> void				add			(T& source, glm::vec2 constant);
+	template<typename T> void				subtract	(T& source, glm::vec2 constant);
 	//void window();
 	//void inverse_window();
-	//void conjugate();
-	//void multiply();
-	//void divide();
-	//void add();
-	//void subtract();
 
 //private:
 
@@ -101,8 +102,8 @@ public:
 	fft_plan create_plan(size_t array_size, const std::vector<size_t>& supported_radixes = { 25, 16, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2 });
 	
 	template<typename T> void split		(T& source, T& target, glm::ivec3 split_count, glm::ivec3 group_count = glm::ivec3(1));
-	template<typename T> void step		(T& source, T& target, size_t radix, fft_dimension dimension = default_fft_dimension<T>(), bool inverse = false);
-	template<typename T> void dft		(T& source, T& target, fft_dimension dimension = default_fft_dimension<T>(), bool inverse = false);
+	template<typename T> void step		(T& source, T& target, size_t radix, fft_dimension dimension = default_fft_dimension<T>(), bool inverse = false, glm::ivec3 group_count = glm::ivec3(1));
+	template<typename T> void dft		(T& source, T& target, fft_dimension dimension = default_fft_dimension<T>(), bool inverse = false, glm::ivec3 group_count = glm::ivec3(1));
 
 	bool shaders_are_set = false;
 
@@ -111,7 +112,7 @@ public:
 	VariantedComputeProgram cp_dft;
 	VariantedComputeProgram cp_split;
 	VariantedComputeProgram cp_step;
-
+	VariantedComputeProgram cp_op;
 };
 
 #include "FFT_Templated.h"

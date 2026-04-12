@@ -54,6 +54,7 @@ inline bool FFFT2::is_same(T& source, T& target)
 	return source.id == target.id;
 }
 
+
 namespace {
 
 	glm::ivec3 to_ivec3(glm::ivec2 size2, int32_t blank_value = 0) {
@@ -98,6 +99,64 @@ namespace {
 }
 
 template<typename T>
+inline  void FFFT2::op(T& source, glm::vec4 constant, std::string operation, std::string additional_definition)
+{
+	compile_shaders();
+
+	if (!is_complex(source) && !is_real(source)) {
+		std::cout << "[FFFT Error] FFFT::op() is called with a source that is neither of real or complex type" << std::endl;
+		ASSERT(false);
+	}
+
+	cp_op.begin_variant();
+	cp_op.variant_define("ffft_source_format",			TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_format(source.get_internal_format_color()));
+	cp_op.variant_define("source_image",				TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_type<T>(source.get_internal_format_color()));
+	cp_op.variant_define("source_image_dimensionality", std::to_string(TextureBase2::get_texture_dimention<T>()));
+
+	cp_op.variant_define("op",	operation);
+	cp_op.variant_define("def", std::string("uniform vec4 constant;"));
+
+	ComputeProgram& kernel = *cp_op.get_current_variant();
+
+	kernel.update_uniform_as_image("fft_source_texture", source, 0);
+	kernel.update_uniform("fft_texture_resolution", to_ivec3(source.get_size(), 1));
+	kernel.update_uniform("constant", constant);
+
+	kernel.dispatch_thread(to_ivec3(source.get_size(), 1));
+}
+
+template<typename T>
+inline void FFFT2::conjugate(T& source)
+{
+	op(source, glm::vec4(0), "value.y *= -1");
+}
+
+template<typename T>
+inline void FFFT2::multiply(T& source, glm::vec2 constant)
+{
+	op(source, glm::vec4(constant, 1, 1), "value.xy *= constant.xy");
+}
+
+template<typename T>
+inline void FFFT2::divide(T& source, glm::vec2 constant)
+{
+	constant = glm::max(constant, glm::vec2(0.00001));
+	op(source, glm::vec4(constant, 1, 1), "value.xy /= constant.xy");
+}
+
+template<typename T>
+inline void FFFT2::add(T& source, glm::vec2 constant)
+{
+	op(source, glm::vec4(constant, 0, 0), "value.xy += constant.xy");
+}
+
+template<typename T>
+inline void FFFT2::subtract(T& source, glm::vec2 constant)
+{
+	op(source, glm::vec4(constant, 0, 0), "value.xy -= constant.xy");
+}
+
+template<typename T>
 inline void FFFT2::split(T& source, T& target, glm::ivec3 split_count, glm::ivec3 group_count)
 {
 	if (is_same(source, target)) {
@@ -137,9 +196,6 @@ inline void FFFT2::split(T& source, T& target, glm::ivec3 split_count, glm::ivec
 	cp_split.variant_define("source_image_dimensionality",	std::to_string(TextureBase2::get_texture_dimention<T>()));
 	cp_split.variant_define("target_image_dimensionality",	std::to_string(TextureBase2::get_texture_dimention<T>()));
 
-	//std::string group_count_str = std::string("ivec3(") + std::to_string(group_count.x) + ", " + std::to_string(group_count.y) + ", " + std::to_string(group_count.z) + ")";
-	//cp_split.variant_define("group_count", group_count_str);
-
 	ComputeProgram& kernel = *cp_split.get_current_variant();
 
 	kernel.update_uniform_as_image("fft_source_texture", source, 0);
@@ -160,7 +216,7 @@ inline void FFFT2::split(T& source, T& target, glm::ivec3 split_count, glm::ivec
 
 
 template<typename T>
-inline void FFFT2::step(T& source, T& target, size_t radix, fft_dimension dimension, bool inverse)
+inline void FFFT2::step(T& source, T& target, size_t radix, fft_dimension dimension, bool inverse, glm::ivec3 group_count)
 {
 	compile_shaders();
 
@@ -219,15 +275,78 @@ inline void FFFT2::step(T& source, T& target, size_t radix, fft_dimension dimens
 	kernel.update_uniform_as_image("fft_target_texture", target, 0);
 
 	kernel.update_uniform("fft_texture_resolution", to_ivec3(source.get_size(), 1));
+	kernel.update_uniform("group_count", group_count);
 
 	kernel.dispatch_thread(to_ivec3(source.get_size(), 1));
 }
 
 template<typename T>
-inline void FFFT2::dft(T& source, T& target, fft_dimension dimension, bool inverse)
+inline void FFFT2::dft(T& source, T& target, fft_dimension dimension, bool inverse, glm::ivec3 group_count)
 {
+	compile_shaders();
 
+	if (is_same(source, target)) {
+		std::cout << "[FFFT Error] FFFT::dft() is called but same texture cannot be used for source and target at the same time" << std::endl;
+		ASSERT(false);
+	}
+
+	if (source.get_size() != target.get_size()) {
+		std::cout << "[FFFT Error] FFFT::dft() is called but source and texture sizes doesn't match" << std::endl;
+		ASSERT(false);
+	}
+
+	if (source.get_internal_format_color() != target.get_internal_format_color()) {
+		std::cout << "[FFFT Error] FFFT::dft() is called but source and target internal formats doesn't match" << std::endl;
+		ASSERT(false);
+	}
+
+	if (dimension != x && dimension != y && dimension != z) {
+		std::cout << "[FFFT Error] FFFT::dft() is called but only a single dimension must be selected" << std::endl;
+		ASSERT(false);
+	}
+
+	if (
+		(dimension == x && to_ivec3(source.get_size(), 1).x < group_count.x) ||
+		(dimension == y && to_ivec3(source.get_size(), 1).y < group_count.y) ||
+		(dimension == z && to_ivec3(source.get_size(), 1).z < group_count.z)
+		) {
+		std::cout << "[FFFT Error] FFFT::dft() is called but group_count exceeds the texture resolution" << std::endl;
+		ASSERT(false);
+	}
+
+	cp_dft.begin_variant();
+	cp_dft.variant_define("ffft_source_format",				TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_format(source.get_internal_format_color()));
+	cp_dft.variant_define("ffft_target_format",				TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_format(target.get_internal_format_color()));
+	cp_dft.variant_define("source_image",					TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_type<T>(source.get_internal_format_color()));
+	cp_dft.variant_define("target_image",					TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_type<T>(target.get_internal_format_color()));
+	cp_dft.variant_define("source_image_dimensionality",	std::to_string(TextureBase2::get_texture_dimention<T>()));
+	cp_dft.variant_define("target_image_dimensionality",	std::to_string(TextureBase2::get_texture_dimention<T>()));
+
+	cp_dft.variant_define("direction", 
+		dimension == x ? "axis_x" :
+		dimension == y ? "axis_y" :
+		dimension == z ? "axis_z" : "axis_x"
+	);
+	cp_dft.variant_define("fft_mode", inverse ? "fft_inverse" : "fft_forward");
+
+	ComputeProgram& kernel = *cp_dft.get_current_variant();
+
+	kernel.update_uniform_as_image("fft_source_texture", source, 0);
+	kernel.update_uniform_as_image("fft_target_texture", target, 0);
+
+	kernel.update_uniform("fft_texture_resolution", to_ivec3(source.get_size(), 1));
+	kernel.update_uniform("group_count", group_count);
+
+	kernel.dispatch_thread(to_ivec3(source.get_size(), 1));
+
+	float divisor =
+		dimension == x ? glm::sqrt(to_ivec3(target.get_size(), 1).x) :
+		dimension == y ? glm::sqrt(to_ivec3(target.get_size(), 1).y) :
+		dimension == z ? glm::sqrt(to_ivec3(target.get_size(), 1).z) : 1;
+
+	divide(target, glm::vec2(divisor));
 }
+
 
 template<typename T>
 inline void FFFT2::copy(T& source, T& target, component comp, glm::ivec3 source_offset, glm::ivec3 target_offset, glm::ivec3 size)
@@ -393,7 +512,7 @@ inline void FFFT2::shift(T& source, T& target, glm::ivec3 shift_amount)
 {
 	if (is_same(source, target)) {
 		std::shared_ptr<T> texture = shift(source, shift_amount);
-		copy(texture, source, real_complex);
+		copy(*texture, source, real_complex);
 		return;
 	}
 
@@ -469,6 +588,35 @@ inline std::shared_ptr<T> FFFT2::i_shift(T& source, glm::ivec3 shift_size)
 template<typename T> 
 void FFFT2::fft(T& source, T& target, fft_dimension dimension, fft_algorithm algorithm) {
 
-	fft_plan plan = create_plan(source.get_size().x);
+	if (algorithm == FFFT2::fft_dft) {
+		T* source_p = &source;
+		T* target_p = &target;
+		
+		if (dimension & x) { dft(*source_p, *target_p, x); std::swap(source_p, target_p); };
+		if (dimension & y) { dft(*source_p, *target_p, y); std::swap(source_p, target_p); };
+		if (dimension & z) { dft(*source_p, *target_p, z); std::swap(source_p, target_p); };
 
+		if (target_p != &target) {
+			copy(source, target, real_complex);
+		}
+	}
+
+	fft_plan plan = create_plan(source.get_size().x);
+}
+
+template<typename T>
+inline void FFFT2::i_fft(T& source, T& target, fft_dimension dimension, fft_algorithm algorithm)
+{
+	if (algorithm == FFFT2::fft_dft) {
+		T* source_p = &source;
+		T* target_p = &target;
+
+		if (dimension & x) { dft(*source_p, *target_p, x, true); std::swap(source_p, target_p); };
+		if (dimension & y) { dft(*source_p, *target_p, y, true); std::swap(source_p, target_p); };
+		if (dimension & z) { dft(*source_p, *target_p, z, true); std::swap(source_p, target_p); };
+
+		if (target_p != &target) {
+			copy(source, target, real_complex);
+		}
+	}
 }

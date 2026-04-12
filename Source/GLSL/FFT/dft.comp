@@ -10,7 +10,11 @@
 #define complex 4
 #define real	5
 
-#define ffft_axis			axis_x
+#define fft_forward 6
+#define fft_inverse 7
+
+#define direction		axis_x
+#define fft_mode		fft_forward
 
 #define ffft_source_format	rg32f
 #define ffft_target_format	r32f
@@ -23,6 +27,15 @@
 
 #define source_number_type	complex
 #define target_number_type	complex
+
+
+#if fft_mode == fft_forward
+	const float mode_coefficient = -1;
+#elif fft_mode == fft_inverse
+	const float mode_coefficient = 1;
+#else 
+	#error "invalid fft_mode"
+#endif
 
 #if		source_image_dimensionality == 1
 #define source_ivec_type ivec1
@@ -44,41 +57,40 @@
 #error	"invalid target dimensionality"
 #endif
 
-
 #if source_image_dimensionality != target_image_dimensionality
 #error "incompatible dimensionality"
 #elif source_image_dimensionality == 1
-	#if		ffft_axis == axis_x
+	#if		direction == axis_x
 		#define workgroup_size_x 64
 		#define workgroup_size_y 1
 		#define workgroup_size_z 1
-	#elif	ffft_axis == axis_y
+	#elif	direction == axis_y
 		#error "incompatible axis and dimensionality"
-	#elif	ffft_axis == axis_z
+	#elif	direction == axis_z
 		#error "incompatible axis and dimensionality"
 	#endif
 #elif source_image_dimensionality == 2
-	#if		ffft_axis == axis_x
+	#if		direction == axis_x
 		#define workgroup_size_x 8
 		#define workgroup_size_y 8
 		#define workgroup_size_z 1
-	#elif	ffft_axis == axis_y
+	#elif	direction == axis_y
 		#define workgroup_size_x 8
 		#define workgroup_size_y 8
 		#define workgroup_size_z 1
-	#elif	ffft_axis == axis_z
+	#elif	direction == axis_z
 		#error "incompatible axis and dimensionality"
 	#endif
 #elif source_image_dimensionality == 3
-	#if		ffft_axis == axis_x
+	#if		direction == axis_x
 		#define workgroup_size_x 4
 		#define workgroup_size_y 4
 		#define workgroup_size_z 4
-	#elif	ffft_axis == axis_y
+	#elif	direction == axis_y
 		#define workgroup_size_x 4
 		#define workgroup_size_y 4
 		#define workgroup_size_z 4
-	#elif	ffft_axis == axis_z
+	#elif	direction == axis_z
 		#define workgroup_size_x 4
 		#define workgroup_size_y 4
 		#define workgroup_size_z 4
@@ -87,19 +99,15 @@
 #error "invalid dimensionality"
 #endif
 
-
 layout (local_size_x = workgroup_size_x, local_size_y = workgroup_size_y, local_size_z = workgroup_size_z) in;
 
-layout(ffft_source_format, binding = 0) uniform source_image fft_read_texture;
-layout(ffft_target_format, binding = 1) uniform target_image fft_write_texture;
+layout(ffft_source_format, binding = 0) uniform source_image fft_source_texture;
+layout(ffft_target_format, binding = 1) uniform target_image fft_target_texture;
 
 uniform ivec3 fft_texture_resolution;
 
-uniform ivec3 fft_texture_offset;
-uniform ivec3 fft_texture_region;
-
 uniform ivec3 group_count;
-
+	
 // complex functions
 float cmagnitude(vec2 a){
 	return (a.x * a.x + a.y * a.y);
@@ -136,35 +144,36 @@ vec2 cpolar(float magnitude, float phase){
 const float PI = 3.14159265358979323846; 
 
 vec2 exp_table(int i, int table_size){
-	return cpolar(1.0, -2 * PI * i / table_size);
+	return cpolar(1.0, mode_coefficient * 2 * PI * i / table_size);
 }
 
 vec2 exp_table_dft(int i, int j, int signal_size){
-	float arg = (float(i) * float(j) * PI * 2.0) / signal_size;
+	float arg = (float(i) * float(j) * PI * 2.0 * mode_coefficient) / signal_size;
 	return vec2 (cos(arg), sin(arg));
 }
 
 void main(){
-	ivec3 region_begin	= max(fft_texture_offset, ivec3(0));
-	ivec3 region_end	= min(fft_texture_resolution, fft_texture_offset + fft_texture_region);
-	ivec3 global_id		= ivec3(id) + region_begin;
-	if (any(greaterThanEqual(global_id, region_end)) || any(lessThan(global_id, region_begin))) return;
+	ivec3 global_id		= ivec3(id);
+	if (any(greaterThanEqual(global_id, fft_texture_resolution))) return;
 	
+	ivec3 group_size	= fft_texture_resolution / group_count;
+	ivec3 group_id		= ivec3(id) / group_size;
+
 	int i;
 	int sample_begin;
 	int sample_end;
-	#if ffft_axis == axis_x
-		i = global_id.x;
-		sample_begin = region_begin.x;
-		sample_end = region_end.x;
-	#elif ffft_axis == axis_y
-		i = global_id.y;
-		sample_begin = region_begin.y;
-		sample_end = region_end.y;
-	#elif ffft_axis == axis_z
-		i = global_id.z;
-		sample_begin = region_begin.z;
-		sample_end = region_end.z;
+	#if direction == axis_x
+		i				= global_id.x;
+		sample_begin	= 0;
+		sample_end		= fft_texture_resolution.x;
+	#elif direction == axis_y
+		i				= global_id.y;
+		sample_begin	= 0;
+		sample_end		= fft_texture_resolution.y;
+	#elif direction == axis_z
+		i				= global_id.z;
+		sample_begin	= 0;
+		sample_end		= fft_texture_resolution.z;
 	#else
 		#error "improper axis defined"
 	#endif
@@ -176,27 +185,27 @@ void main(){
 
 		vec4 signal_j;
 
-		#if		ffft_axis == axis_x
-			signal_j = imageLoad(fft_read_texture, source_ivec_type (ivec3(j, global_id.y, global_id.z)));
-		#elif	ffft_axis == axis_y
-			signal_j = imageLoad(fft_read_texture, source_ivec_type (ivec3(global_id.x, j, global_id.z)));
-		#elif	ffft_axis == axis_z
-			signal_j = imageLoad(fft_read_texture, source_ivec_type (ivec3(global_id.x, global_id.y, j)));
+		#if		direction == axis_x
+			signal_j = imageLoad(fft_source_texture, source_ivec_type (ivec3(j, global_id.y, global_id.z)));
+		#elif	direction == axis_y
+			signal_j = imageLoad(fft_source_texture, source_ivec_type (ivec3(global_id.x, j, global_id.z)));
+		#elif	direction == axis_z
+			signal_j = imageLoad(fft_source_texture, source_ivec_type (ivec3(global_id.x, global_id.y, j)));
 		#endif
 	
 		vec2 cos_sin = exp_table_dft(i, j, sample_end - sample_begin);
 		
 		#if		source_number_type == complex
 			re += signal_j.r * cos_sin.x - signal_j.g * cos_sin.y;
-			im -= signal_j.r * cos_sin.y + signal_j.g * cos_sin.x;
+			im += signal_j.r * cos_sin.y + signal_j.g * cos_sin.x;
 		#elif	source_number_type == real
 			re += signal_j.r * cos_sin.x;
-			im -= signal_j.r * cos_sin.y;
+			im += signal_j.r * cos_sin.y;
 		#else
 			#error "invalid source_number_type"
 		#endif
 		
 	}
 
-	imageStore(fft_write_texture, target_ivec_type(ivec3(global_id.xyz)), vec4(re, im, 0, 1));
+	imageStore(fft_target_texture, target_ivec_type(ivec3(global_id.xyz)), vec4(re, im, 0, 1));
 }
