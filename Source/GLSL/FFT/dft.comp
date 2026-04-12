@@ -168,12 +168,13 @@ void main(){
 		sample_end		= min((group_id.x+1) * group_size.x, fft_texture_resolution.x);
 	#elif direction == axis_y
 		i				= global_id.y;
-		sample_begin	= 0;
-		sample_end		= fft_texture_resolution.y;
+		sample_begin	= group_id.y * group_size.y;
+		sample_end		= min((group_id.y+1) * group_size.y, fft_texture_resolution.y);
 	#elif direction == axis_z
 		i				= global_id.z;
-		sample_begin	= 0;
-		sample_end		= fft_texture_resolution.z;
+		sample_begin	= group_id.z * group_size.z;
+		sample_end		= min((group_id.z+1) * group_size.z, fft_texture_resolution.z);
+	
 	#else
 		#error "improper axis defined"
 	#endif

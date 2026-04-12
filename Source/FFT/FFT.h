@@ -24,7 +24,7 @@ public:
 		z	= 0b100,
 		xy	= x | y,
 		yz	= y | z,
-		xz	= x | y,
+		xz	= x | z,
 		xyz = x | y | z,
 	};
 
@@ -36,23 +36,15 @@ public:
 		hamming,
 	};
 
-	enum fft_algorithm {
-		fft_dft,
-		fft_radix2_zeropadding,
-		fft_radix2_dft,
-		fft_radix235_zeropadding,
-		fft_radix235_dft,
-	};
-
 	enum component {
 		real,
 		complex,
 		real_complex,
 	};
 
-	template<typename T> void				fft		(T&	source,	T& target, fft_dimension dimension = default_fft_dimension<T>(), fft_algorithm algorithm = fft_radix235_dft);
-	template<typename T> void				i_fft	(T&	source,	T& target, fft_dimension dimension = default_fft_dimension<T>(), fft_algorithm algorithm = fft_radix235_dft);
-	
+	template<typename T> void				fft		(T&	source,	T& target, fft_dimension dimension = default_fft_dimension<T>(), size_t max_radix = 32);
+	template<typename T> void				i_fft	(T&	source,	T& target, fft_dimension dimension = default_fft_dimension<T>(), size_t max_radix = 32);
+
 	template<typename T> void				shift	(T&	source,	T& target, glm::ivec3 shift_size);
 	template<typename T> std::shared_ptr<T>	shift	(T&	source, glm::ivec3 shift_size);
 	template<typename T> void				i_shift	(T& source, T& target, glm::ivec3 shift_size);
@@ -75,7 +67,7 @@ public:
 	//void window();
 	//void inverse_window();
 
-//private:
+private:
 
 	template<typename T> static bool is_complex(T& source);
 	template<typename T> static bool is_real(T& source);
@@ -101,6 +93,7 @@ public:
 	fft_plan create_plan(size_t array_size, size_t supported_max_radix, size_t supported_min_radix = fft_iteration::radix_dft);
 	fft_plan create_plan(size_t array_size, const std::vector<size_t>& supported_radixes = { 25, 16, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2 });
 	
+	template<typename T> void mixed_fft	(T& source, T& target, fft_dimension dimension = default_fft_dimension<T>(), size_t max_radix = 32, bool inverse = false);
 	template<typename T> void split		(T& source, T& target, glm::ivec3 split_count, glm::ivec3 group_count = glm::ivec3(1));
 	template<typename T> void step		(T& source, T& target, size_t radix, fft_dimension dimension = default_fft_dimension<T>(), bool inverse = false, glm::ivec3 group_count = glm::ivec3(1));
 	template<typename T> void dft		(T& source, T& target, fft_dimension dimension = default_fft_dimension<T>(), bool inverse = false, glm::ivec3 group_count = glm::ivec3(1));

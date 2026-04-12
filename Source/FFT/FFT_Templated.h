@@ -319,7 +319,7 @@ inline void FFFT2::dft(T& source, T& target, fft_dimension dimension, bool inver
 		dimension == y ? glm::sqrt(to_ivec3(target.get_size(), 1).y) :
 		dimension == z ? glm::sqrt(to_ivec3(target.get_size(), 1).z) : 1;
 
-	divide(target, glm::vec2(divisor));
+	//divide(target, glm::vec2(divisor));
 }
 
 
@@ -561,61 +561,97 @@ inline std::shared_ptr<T> FFFT2::i_shift(T& source, glm::ivec3 shift_size)
 }
 
 template<typename T> 
-void FFFT2::fft(T& source, T& target, fft_dimension dimension, fft_algorithm algorithm) {
+void FFFT2::mixed_fft(T& source, T& target, fft_dimension dimension, size_t max_radix, bool inverse) {
 
-	if (algorithm == FFFT2::fft_dft) {
-		T* source_p = &source;
-		T* target_p = &target;
-		
-		if (dimension & x) { dft(*source_p, *target_p, x); std::swap(source_p, target_p); };
-		if (dimension & y) { dft(*source_p, *target_p, y); std::swap(source_p, target_p); };
-		if (dimension & z) { dft(*source_p, *target_p, z); std::swap(source_p, target_p); };
-
-		if (target_p != &target)
-			copy(source, target, real_complex);
-		return;
+	if (dimension != x && dimension != y && dimension != z) {
+		std::cout << "[FFFT Error] FFFT::mixed_fft() is called with invalid dimension" << std::endl;
+		ASSERT(false);
 	}
 
-	if (algorithm == FFFT2::fft_radix2_dft) {
-		T* source_p = &source;
-		T* target_p = &target;
-		
-		glm::ivec3 group_count	= glm::ivec3(1);
-		glm::ivec3 split_count	= glm::ivec3(2, 1, 1);
-		int32_t counter = 0;
-		while (group_count.x < source.get_size().x) {
-			split(*source_p, *target_p, split_count, group_count);
-			std::swap(source_p, target_p);
-			group_count *= split_count;
-			counter++;
-		}
+	size_t array_size =
+		dimension == x ? to_ivec3(source.get_size()).x :
+		dimension == y ? to_ivec3(source.get_size()).y :
+		dimension == z ? to_ivec3(source.get_size()).z : to_ivec3(source.get_size()).x;
 
-		for (int32_t i = 0; i < counter; i++) {
-		//while(group_count.x >= 1) {
-			step(*source_p, *target_p, 2, x, false, group_count);
-			group_count.x /= 2;
-			std::swap(source_p, target_p);
-		}
+	max_radix = std::max(max_radix, (size_t)1);
 
-		if (target_p != &target)
-			copy(source, target, real_complex);
-		return;
+	fft_plan plan = create_plan(array_size, max_radix);
+
+	T* source_p = &source;
+	T* target_p = &target;
+
+	for (int32_t i = 0; i < plan.iterations.size(); i++) {
+		fft_iteration& iteration = plan.iterations[i];
+
+		if (iteration.radix == fft_iteration::radix_dft)
+			break;
+
+		glm::ivec3 split_count = glm::ivec3(1, 1, 1);
+		if (dimension == x) split_count.x = iteration.radix;
+		if (dimension == y) split_count.y = iteration.radix;
+		if (dimension == z) split_count.z = iteration.radix;
+
+		glm::ivec3 group_count = glm::ivec3(1, 1, 1);
+		if (dimension == x) group_count.x = array_size / iteration.chunk_size / iteration.radix;
+		if (dimension == y) group_count.y = array_size / iteration.chunk_size / iteration.radix;
+		if (dimension == z) group_count.z = array_size / iteration.chunk_size / iteration.radix;
+
+		//std::cout << "radix:\t\t" << iteration.radix << ", " << group_count << ", " << iteration.chunk_size << std::endl;
+		split(*source_p, *target_p, split_count, group_count);
+		std::swap(source_p, target_p);
 	}
+
+	//std::cout << "----------------------" << std::endl;
+
+	for (int32_t i = plan.iterations.size() - 1; i >= 0; i--) {
+		fft_iteration& iteration = plan.iterations[i];
+
+		glm::ivec3 group_count = glm::ivec3(1, 1, 1);
+		if (dimension == x) group_count.x = array_size / iteration.chunk_size / iteration.radix;
+		if (dimension == y) group_count.y = array_size / iteration.chunk_size / iteration.radix;
+		if (dimension == z) group_count.z = array_size / iteration.chunk_size / iteration.radix;
+
+		std::cout << "radix:\t\t" << iteration.radix << ", " <<  group_count << ", " << iteration.chunk_size << std::endl;
+		if (iteration.radix == fft_iteration::radix_dft) {
+			dft(*source_p, *target_p, dimension, inverse, group_count);
+			std::swap(source_p, target_p);
+		}
+		else {
+			step(*source_p, *target_p, iteration.radix, dimension, inverse, group_count);
+			std::swap(source_p, target_p);
+		}
+	}
+
+	if (target_p != &source)
+		copy(source, target, real_complex);
+
+	divide(target, glm::vec2(glm::sqrt(array_size)));
 }
 
 template<typename T>
-inline void FFFT2::i_fft(T& source, T& target, fft_dimension dimension, fft_algorithm algorithm)
+inline void FFFT2::fft(T& source, T& target, fft_dimension dimension, size_t max_radix)
 {
-	if (algorithm == FFFT2::fft_dft) {
-		T* source_p = &source;
-		T* target_p = &target;
+	T* source_p = &source;
+	T* target_p = &target;
 
-		if (dimension & x) { dft(*source_p, *target_p, x, true); std::swap(source_p, target_p); };
-		if (dimension & y) { dft(*source_p, *target_p, y, true); std::swap(source_p, target_p); };
-		if (dimension & z) { dft(*source_p, *target_p, z, true); std::swap(source_p, target_p); };
+	if (dimension & x) { mixed_fft(*source_p, *target_p, x, max_radix, false); std::swap(source_p, target_p); }
+	if (dimension & y) { mixed_fft(*source_p, *target_p, y, max_radix, false); std::swap(source_p, target_p); }
+	if (dimension & z) { mixed_fft(*source_p, *target_p, z, max_radix, false); std::swap(source_p, target_p); }
 
-		if (target_p != &target) {
-			copy(source, target, real_complex);
-		}
-	}
+	if (target_p != &source)
+		copy(source, target, real_complex);
+}
+
+template<typename T>
+inline void FFFT2::i_fft(T& source, T& target, fft_dimension dimension, size_t max_radix)
+{
+	T* source_p = &source;
+	T* target_p = &target;
+
+	if (dimension & x) { mixed_fft(*source_p, *target_p, x, max_radix, true); std::swap(source_p, target_p); };
+	if (dimension & y) { mixed_fft(*source_p, *target_p, y, max_radix, true); std::swap(source_p, target_p); };
+	if (dimension & z) { mixed_fft(*source_p, *target_p, z, max_radix, true); std::swap(source_p, target_p); };
+
+	if (target_p != &source)
+		copy(source, target, real_complex);
 }

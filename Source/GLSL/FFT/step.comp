@@ -116,19 +116,6 @@ vec2 cpolar(float magnitude, float phase){
 
 const float PI = 3.14159265358979323846; 
 
-vec2 exp_table(int i, int table_size){
-	return cpolar(1.0, -2 * PI * i / table_size);
-}
-
-vec2 exp_table_dft(int i, int j, int signal_size){
-	float arg = (float(i) * float(j) * PI * 2.0) / signal_size;
-	return vec2 (cos(arg), sin(arg));
-}
-
-int intager_positive_modulo(int a, int b){
-	return ((a % b) + b) % b;
-}
-
 void main() {
     ivec3 res = fft_texture_resolution;
     // Bounds check: since we dispatch 1/radix threads, 
