@@ -611,7 +611,7 @@ void FFFT2::mixed_fft(T& source, T& target, fft_dimension dimension, size_t max_
 		if (dimension == y) group_count.y = array_size / iteration.chunk_size / iteration.radix;
 		if (dimension == z) group_count.z = array_size / iteration.chunk_size / iteration.radix;
 
-		std::cout << "radix:\t\t" << iteration.radix << ", " <<  group_count << ", " << iteration.chunk_size << std::endl;
+		//std::cout << "radix:\t\t" << iteration.radix << ", " <<  group_count << ", " << iteration.chunk_size << std::endl;
 		if (iteration.radix == fft_iteration::radix_dft) {
 			dft(*source_p, *target_p, dimension, inverse, group_count);
 			std::swap(source_p, target_p);
