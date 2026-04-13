@@ -57,6 +57,7 @@ public:
 
 	template<typename T> void				copy	(T& source,	T& target, component comp = real_complex, glm::ivec3 source_offset = glm::ivec3(0), glm::ivec3 target_offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
 	template<typename T> std::shared_ptr<T> create	(T& source, component comp = real_complex, glm::ivec3 size = glm::ivec3(0));
+	template<typename T> std::shared_ptr<T> create	(TextureBase2::ColorTextureFormat format, component comp = real_complex, glm::ivec3 size = glm::ivec3(0));
 
 	template<typename T> void				pad		(T& source, T& target, glm::ivec3 offset = glm::ivec3(0), glm::vec2 padding_value = glm::vec2(0));
 	template<typename T> void				i_pad	(T& source, T& target, glm::ivec3 offset = glm::ivec3(0));
@@ -71,6 +72,7 @@ public:
 	template<typename T> void				subtract	(T& source, glm::vec2 constant);
 	//void window();
 	//void inverse_window();
+
 
 private:
 

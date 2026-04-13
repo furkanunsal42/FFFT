@@ -405,6 +405,18 @@ inline std::shared_ptr<T> FFFT2::create(T& source, component comp, glm::ivec3 si
 	return create_texture_glm<T>(to_ivec3(source.get_size()), format);
 }
 
+template<typename T>
+inline std::shared_ptr<T> FFFT2::create(TextureBase2::ColorTextureFormat format, component comp, glm::ivec3 size)
+{
+	compile_shaders();
+
+	if (comp == real)			format = real_texture_format(format);
+	if (comp == complex)		format = complex_texture_format(format);
+	if (comp == real_complex)	format = complex_texture_format(format);
+
+	return create_texture_glm<T>(size, format);
+}
+
 
 template<typename T>
 inline void FFFT2::pad(T& source, T& target, glm::ivec3 offset, glm::vec2 padding_value)
