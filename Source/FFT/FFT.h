@@ -113,6 +113,14 @@ private:
 	VariantedComputeProgram cp_split;
 	VariantedComputeProgram cp_step;
 	VariantedComputeProgram cp_op;
+
+	glm::ivec3 to_ivec3(glm::ivec3 size3, int32_t blank_value = 0);
+	glm::ivec3 to_ivec3(glm::ivec2 size2, int32_t blank_value = 0);
+	glm::ivec3 to_ivec3(glm::ivec1 size1, int32_t blank_value = 0);
+	template<typename texture_type>
+	std::shared_ptr<texture_type> create_texture_glm(glm::ivec3 size, Texture2D::ColorTextureFormat format) = delete;
+	template<typename texture_type, typename vector_type>
+	void clear_texture_glm(texture_type& texture, vector_type offset, vector_type size, glm::vec4 color) = delete;
 };
 
 #include "FFT_Templated.h"

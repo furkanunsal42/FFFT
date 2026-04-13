@@ -25,47 +25,38 @@ inline bool FFFT2::is_same(T& source, T& target)
 	return source.id == target.id;
 }
 
-namespace {
+template<> 
+inline std::shared_ptr<Texture1D> FFFT2::create_texture_glm(glm::ivec3 size, Texture2D::ColorTextureFormat format) {
+	return std::make_shared<Texture1D>(size.x, format, 1, 0);
+}
+template<> 
+inline std::shared_ptr<Texture2D> FFFT2::create_texture_glm(glm::ivec3 size, Texture2D::ColorTextureFormat format) {
+	return std::make_shared<Texture2D>(size.x, size.y, format, 1, 0);
+}
+template<> 
+inline std::shared_ptr<Texture2DArray> FFFT2::create_texture_glm(glm::ivec3 size, Texture2D::ColorTextureFormat format) {
+	return std::make_shared<Texture2DArray>(size.x, size.y, size.z, format, 1, 0);
+}
+template<> 
+inline std::shared_ptr<Texture3D> FFFT2::create_texture_glm(glm::ivec3 size, Texture2D::ColorTextureFormat format) {
+	return std::make_shared<Texture3D>(size.x, size.y, size.z, format, 1, 0);
+}
 
-	glm::ivec3 to_ivec3(glm::ivec2 size2, int32_t blank_value = 0) {
-		return glm::ivec3(size2.x, size2.y, blank_value);
-	}
-
-	glm::ivec3 to_ivec3(glm::ivec1 size1, int32_t blank_value = 0) {
-		return glm::ivec3(size1.x, blank_value, blank_value);
-	}
-
-	template<typename texture_type>
-	std::shared_ptr<texture_type> create_texture_glm(glm::ivec3 size, Texture2D::ColorTextureFormat format) = delete;
-
-	template<> std::shared_ptr<Texture1D> create_texture_glm(glm::ivec3 size, Texture2D::ColorTextureFormat format) {
-		return std::make_shared<Texture1D>(size.x, format, 1, 0);
-	}
-	template<> std::shared_ptr<Texture2D> create_texture_glm(glm::ivec3 size, Texture2D::ColorTextureFormat format) {
-		return std::make_shared<Texture2D>(size.x, size.y, format, 1, 0);
-	}
-	template<> std::shared_ptr<Texture2DArray> create_texture_glm(glm::ivec3 size, Texture2D::ColorTextureFormat format) {
-		return std::make_shared<Texture2DArray>(size.x, size.y, size.z, format, 1, 0);
-	}
-	template<> std::shared_ptr<Texture3D> create_texture_glm(glm::ivec3 size, Texture2D::ColorTextureFormat format) {
-		return std::make_shared<Texture3D>(size.x, size.y, size.z, format, 1, 0);
-	}
-
-	template<typename texture_type, typename vector_type>
-	void clear_texture_glm(texture_type& texture, vector_type offset, vector_type size, glm::vec4 color) = delete;
-
-	template<> void clear_texture_glm(Texture1D& texture, glm::ivec3 offset, glm::ivec3 size, glm::vec4 color) {
-		texture.clear(color, offset.x, size.x, 0);
-	}
-	template<> void clear_texture_glm(Texture2D& texture, glm::ivec3 offset, glm::ivec3 size, glm::vec4 color) {
-		texture.clear(color, offset.x, offset.y, size.x, size.y, 0);
-	}
-	template<> void clear_texture_glm(Texture2DArray& texture, glm::ivec3 offset, glm::ivec3 size, glm::vec4 color) {
-		texture.clear(color, offset.x, offset.y, offset.z, size.x, size.y, size.z, 0);
-	}
-	template<> void clear_texture_glm(Texture3D& texture, glm::ivec3 offset, glm::ivec3 size, glm::vec4 color) {
-		texture.clear(color, offset.x, offset.y, offset.z, size.x, size.y, size.z, 0);
-	}
+template<> 
+inline void FFFT2::clear_texture_glm(Texture1D& texture, glm::ivec3 offset, glm::ivec3 size, glm::vec4 color) {
+	texture.clear(color, offset.x, size.x, 0);
+}
+template<> 
+inline void FFFT2::clear_texture_glm(Texture2D& texture, glm::ivec3 offset, glm::ivec3 size, glm::vec4 color) {
+	texture.clear(color, offset.x, offset.y, size.x, size.y, 0);
+}
+template<> 
+inline void FFFT2::clear_texture_glm(Texture2DArray& texture, glm::ivec3 offset, glm::ivec3 size, glm::vec4 color) {
+	texture.clear(color, offset.x, offset.y, offset.z, size.x, size.y, size.z, 0);
+}
+template<> 
+inline void FFFT2::clear_texture_glm(Texture3D& texture, glm::ivec3 offset, glm::ivec3 size, glm::vec4 color) {
+	texture.clear(color, offset.x, offset.y, offset.z, size.x, size.y, size.z, 0);
 }
 
 template<typename T>
@@ -402,7 +393,7 @@ inline std::shared_ptr<T> FFFT2::create(T& source, component comp, glm::ivec3 si
 	if (size.y <= 0) size.y = to_ivec3(source.get_size()).y;
 	if (size.z <= 0) size.z = to_ivec3(source.get_size()).z;
 
-	return create_texture_glm<T>(to_ivec3(source.get_size()), format);
+	return create_texture_glm<T>(size, format);
 }
 
 template<typename T>

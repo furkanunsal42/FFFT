@@ -47,9 +47,9 @@
 	#define workgroup_size_y 8
 	#define workgroup_size_z 1
 #elif source_image_dimensionality == 3
-	#define workgroup_size_x 4
-	#define workgroup_size_y 4
-	#define workgroup_size_z 4
+	#define workgroup_size_x 8
+	#define workgroup_size_y 8
+	#define workgroup_size_z 1
 #else
 #error "invalid dimensionality"
 #endif
