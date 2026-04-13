@@ -7,7 +7,7 @@
 #include "Buffer.h"
 
 #include "ComputeProgram.h"
-#include "Tools/VariantedComputeProgram.h"
+#include "Tools/VariantedComputeProgram/VariantedComputeProgram.h"
 
 #include <filesystem>
 
@@ -15,6 +15,7 @@ namespace shader_directory {
 	static std::filesystem::path ffft2_shader_directory = "../FFFT/Source/GLSL/FFT/";
 }
 
+// Fast & Furious Fourier Transform
 class FFFT2 {
 public:
 	
@@ -44,11 +45,15 @@ public:
 
 	template<typename T> void				fft		(T&	source,	T& target, fft_dimension dimension = default_fft_dimension<T>(), size_t max_radix = 32);
 	template<typename T> void				i_fft	(T&	source,	T& target, fft_dimension dimension = default_fft_dimension<T>(), size_t max_radix = 32);
-
+	
 	template<typename T> void				shift	(T&	source,	T& target, glm::ivec3 shift_size);
 	template<typename T> std::shared_ptr<T>	shift	(T&	source, glm::ivec3 shift_size);
+	template<typename T> void				shift	(T& source, T& target, fft_dimension dimension);
+	template<typename T> std::shared_ptr<T>	shift	(T& source, fft_dimension dimension);
 	template<typename T> void				i_shift	(T& source, T& target, glm::ivec3 shift_size);
 	template<typename T> std::shared_ptr<T>	i_shift	(T& source, glm::ivec3 shift_size);
+	template<typename T> void				i_shift	(T& source, T& target, fft_dimension dimension);
+	template<typename T> std::shared_ptr<T>	i_shift	(T& source, fft_dimension dimension);
 
 	template<typename T> void				copy	(T& source,	T& target, component comp = real_complex, glm::ivec3 source_offset = glm::ivec3(0), glm::ivec3 target_offset = glm::ivec3(0), glm::ivec3 size = glm::ivec3(0));
 	template<typename T> std::shared_ptr<T> create	(T& source, component comp = real_complex, glm::ivec3 size = glm::ivec3(0));

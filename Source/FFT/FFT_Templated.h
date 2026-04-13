@@ -545,6 +545,26 @@ inline std::shared_ptr<T> FFFT2::shift(T& source, glm::ivec3 shift_size)
 }
 
 template<typename T>
+inline void FFFT2::shift(T& source, T& target, fft_dimension dimension)
+{
+	glm::ivec3 shift_amount = glm::ivec3(0);
+	if (dimension & x) shift_amount.x = to_ivec3(source.get_size(), 1).x / 2;
+	if (dimension & y) shift_amount.y = to_ivec3(source.get_size(), 1).y / 2;
+	if (dimension & z) shift_amount.z = to_ivec3(source.get_size(), 1).z / 2;
+	shift(source, target, shift_amount);
+}
+
+template<typename T>
+inline std::shared_ptr<T> FFFT2::shift(T& source, fft_dimension dimension)
+{
+	glm::ivec3 shift_amount = glm::ivec3(0);
+	if (dimension & x) shift_amount.x = to_ivec3(source.get_size(), 1).x / 2;
+	if (dimension & y) shift_amount.y = to_ivec3(source.get_size(), 1).y / 2;
+	if (dimension & z) shift_amount.z = to_ivec3(source.get_size(), 1).z / 2;
+	return shift(source, shift_amount);
+}
+
+template<typename T>
 inline void FFFT2::i_shift(T& source, T& target, glm::ivec3 shift_size)
 {
 	compile_shaders();
@@ -558,6 +578,27 @@ inline std::shared_ptr<T> FFFT2::i_shift(T& source, glm::ivec3 shift_size)
 	std::shared_ptr<T> target = source.create_texture_with_same_parameters();
 	i_shift(source, *target, shift_size);
 	return target;
+}
+
+template<typename T>
+inline void FFFT2::i_shift(T& source, T& target, fft_dimension dimension)
+{
+	glm::ivec3 shift_amount = glm::ivec3(0);
+	if (dimension & x) shift_amount.x = to_ivec3(source.get_size(), 1).x / 2;
+	if (dimension & y) shift_amount.y = to_ivec3(source.get_size(), 1).y / 2;
+	if (dimension & z) shift_amount.z = to_ivec3(source.get_size(), 1).z / 2;
+	shift(source, target, -shift_amount);
+}
+
+template<typename T>
+inline std::shared_ptr<T> FFFT2::i_shift(T& source, fft_dimension dimension)
+{
+	glm::ivec3 shift_amount = glm::ivec3(0);
+	if (dimension & x) shift_amount.x = to_ivec3(source.get_size(), 1).x / 2;
+	if (dimension & y) shift_amount.y = to_ivec3(source.get_size(), 1).y / 2;
+	if (dimension & z) shift_amount.z = to_ivec3(source.get_size(), 1).z / 2;
+	return shift(source, -shift_amount);
+
 }
 
 template<typename T> 
