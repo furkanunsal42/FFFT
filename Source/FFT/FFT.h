@@ -70,6 +70,8 @@ public:
 	template<typename T> void				divide		(T& source, glm::vec2 constant);
 	template<typename T> void				add			(T& source, glm::vec2 constant);
 	template<typename T> void				subtract	(T& source, glm::vec2 constant);
+
+	template<typename T> void				taper_tukey	(T& source, fft_dimension dimension, float alpha = 0.01f);
 	//void window();
 	//void inverse_window();
 
@@ -113,6 +115,7 @@ private:
 	VariantedComputeProgram cp_split;
 	VariantedComputeProgram cp_step;
 	VariantedComputeProgram cp_op;
+	VariantedComputeProgram cp_window;
 
 	glm::ivec3 to_ivec3(glm::ivec3 size3, int32_t blank_value = 0);
 	glm::ivec3 to_ivec3(glm::ivec2 size2, int32_t blank_value = 0);

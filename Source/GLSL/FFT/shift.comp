@@ -73,7 +73,7 @@ void main(){
 	if (any(greaterThanEqual(ivec3(id), fft_texture_resolution)))
 		return;
 	
-	ivec3 read_location = ivec3(intager_positive_mod((ivec3(id)) - fft_shift_amount, fft_texture_resolution));
+	ivec3 read_location = ivec3(intager_positive_mod((ivec3(id)) + fft_shift_amount, fft_texture_resolution));
 	
 	vec4 shifted_value = imageLoad(fft_source_texture, source_ivec_type (ivec3(read_location)));
 	imageStore(fft_target_texture, target_ivec_type(ivec3(id.xyz)), shifted_value);

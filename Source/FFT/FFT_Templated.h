@@ -118,6 +118,35 @@ inline void FFFT2::subtract(T& source, glm::vec2 constant)
 }
 
 template<typename T>
+inline void FFFT2::taper_tukey(T& source, fft_dimension dimension, float alpha)
+{
+	compile_shaders();
+
+	if (dimension != x && dimension != y && dimension != z) {
+		std::cout << "[FFFT Error] FFFT::taper_tukey() is called with composite dimension but it is not supported" << std::endl;
+		ASSERT(false);
+	}
+
+	cp_window.begin_variant();
+	cp_window.variant_define("ffft_source_format",			TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_format(source.get_internal_format_color()));
+	cp_window.variant_define("source_image",				TextureBase2::ColorTextureFormat_to_OpenGL_compute_Image_type<T>(source.get_internal_format_color()));
+	cp_window.variant_define("source_image_dimensionality", std::to_string(TextureBase2::get_texture_dimention<T>()));
+	
+	cp_step.variant_define("direction",
+		dimension == x ? "axis_x" :
+		dimension == y ? "axis_y" :
+		dimension == z ? "axis_z" : "axis_x");
+
+	ComputeProgram& kernel = *cp_window.get_current_variant();
+
+	kernel.update_uniform_as_image("fft_source_texture", source, 0);
+	kernel.update_uniform("fft_texture_resolution", to_ivec3(source.get_size(), 1));
+	kernel.update_uniform("alpha", alpha);
+
+	kernel.dispatch_thread(to_ivec3(source.get_size(), 1));
+}
+
+template<typename T>
 inline void FFFT2::split(T& source, T& target, glm::ivec3 split_count, glm::ivec3 group_count)
 {
 	if (is_same(source, target)) {
@@ -340,10 +369,10 @@ inline void FFFT2::copy(T& source, T& target, component comp, glm::ivec3 source_
 
 	if (is_real(source) && is_real(target) && comp == complex)
 		return;
-
-	if (size.x == 0) size.x = to_ivec3(glm::min(source.get_size(), target.get_size()), 1).x - max(source_offset, target_offset).x;
-	if (size.y == 0) size.y = to_ivec3(glm::min(source.get_size(), target.get_size()), 1).y - max(source_offset, target_offset).y;
-	if (size.z == 0) size.z = to_ivec3(glm::min(source.get_size(), target.get_size()), 1).z - max(source_offset, target_offset).z;
+	
+	if (size.x == 0) size.x = glm::min(to_ivec3(source.get_size(), 1).x - source_offset.x, to_ivec3(target.get_size(), 1).x - target_offset.x);
+	if (size.y == 0) size.y = glm::min(to_ivec3(source.get_size(), 1).y - source_offset.y, to_ivec3(target.get_size(), 1).y - target_offset.y);
+	if (size.z == 0) size.z = glm::min(to_ivec3(source.get_size(), 1).z - source_offset.z, to_ivec3(target.get_size(), 1).z - target_offset.z);
 
 	bool source_overflow = glm::any(glm::greaterThan(source_offset + size, to_ivec3(source.get_size(), 1)));
 	bool target_overflow = glm::any(glm::greaterThan(target_offset + size, to_ivec3(target.get_size(), 1)));

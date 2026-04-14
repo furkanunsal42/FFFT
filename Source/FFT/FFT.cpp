@@ -62,6 +62,7 @@ void FFFT2::compile_shaders() {
 	cp_split.set_shader(	Shader(shader_directory::ffft2_shader_directory / "split.comp"));
 	cp_step.set_shader(		Shader(shader_directory::ffft2_shader_directory / "step.comp"));
 	cp_op.set_shader(		Shader(shader_directory::ffft2_shader_directory / "op.comp"));
+	cp_window.set_shader(	Shader(shader_directory::ffft2_shader_directory / "window.comp"));
 
 	shaders_are_set = true;
 
