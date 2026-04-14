@@ -1,2 +1,2 @@
 # FFFT
-Fast Fucking Fourier Transform on the GPU, implements mixed-radix-fft with radix sizes: 2, 3, 5. Built with GraphicsCortex
+Fast & Furious Fourier Transform on the GPU, implements 1D/2D/3D mixed-radix-fft with dynamic-sized radixes. includes zero-padding and windowing utilities. Built with GraphicsCortex 
