@@ -1,5 +1,6 @@
 #pragma once
 #include "FFT.h"
+#include "GLMExtensions.h"
 
 template<> inline constexpr FFFT2::fft_dimension FFFT2::default_fft_dimension<Buffer>()			{ return x; }
 template<> inline constexpr FFFT2::fft_dimension FFFT2::default_fft_dimension<Texture1D>()		{ return x; }
@@ -80,10 +81,10 @@ inline  void FFFT2::op(T& source, glm::vec4 constant, std::string operation, std
 	ComputeProgram& kernel = *cp_op.get_current_variant();
 
 	kernel.update_uniform_as_image("fft_source_texture", source, 0);
-	kernel.update_uniform("fft_texture_resolution", to_ivec3(source.get_size(), 1));
+	kernel.update_uniform("fft_texture_resolution", cortexglm::to_ivec3(source.get_size(), 1));
 	kernel.update_uniform("constant", constant);
 
-	kernel.dispatch_thread(to_ivec3(source.get_size(), 1));
+	kernel.dispatch_thread(cortexglm::to_ivec3(source.get_size(), 1));
 }
 
 template<typename T>
@@ -140,10 +141,10 @@ inline void FFFT2::taper_tukey(T& source, fft_dimension dimension, float alpha)
 	ComputeProgram& kernel = *cp_window.get_current_variant();
 
 	kernel.update_uniform_as_image("fft_source_texture", source, 0);
-	kernel.update_uniform("fft_texture_resolution", to_ivec3(source.get_size(), 1));
+	kernel.update_uniform("fft_texture_resolution", cortexglm::to_ivec3(source.get_size(), 1));
 	kernel.update_uniform("alpha", alpha);
 
-	kernel.dispatch_thread(to_ivec3(source.get_size(), 1));
+	kernel.dispatch_thread(cortexglm::to_ivec3(source.get_size(), 1));
 }
 
 template<typename T>
@@ -174,7 +175,7 @@ inline void FFFT2::split(T& source, T& target, glm::ivec3 split_count, glm::ivec
 		ASSERT(false);
 	}
 
-	if (glm::any(glm::notEqual(to_ivec3(source.get_size(), 1) % group_count, glm::ivec3(0)))) {
+	if (glm::any(glm::notEqual(cortexglm::to_ivec3(source.get_size(), 1) % group_count, glm::ivec3(0)))) {
 		ASSERT(false);
 	}
 
@@ -191,17 +192,17 @@ inline void FFFT2::split(T& source, T& target, glm::ivec3 split_count, glm::ivec
 	kernel.update_uniform_as_image("fft_source_texture", source, 0);
 	kernel.update_uniform_as_image("fft_target_texture", target, 0);
 
-	kernel.update_uniform("fft_source_texture_resolution", to_ivec3(source.get_size(), 1));
-	kernel.update_uniform("fft_target_texture_resolution", to_ivec3(target.get_size(), 1));
+	kernel.update_uniform("fft_source_texture_resolution", cortexglm::to_ivec3(source.get_size(), 1));
+	kernel.update_uniform("fft_target_texture_resolution", cortexglm::to_ivec3(target.get_size(), 1));
 
 	kernel.update_uniform("fft_texture_source_offset", glm::ivec3(0));
 	kernel.update_uniform("fft_texture_target_offset", glm::ivec3(0));
-	kernel.update_uniform("fft_texture_region", to_ivec3(source.get_size(), 1));
+	kernel.update_uniform("fft_texture_region", cortexglm::to_ivec3(source.get_size(), 1));
 
 	kernel.update_uniform("group_count", group_count);
 	kernel.update_uniform("split_count", split_count);
 
-	kernel.dispatch_thread(to_ivec3(source.get_size(), 1));
+	kernel.dispatch_thread(cortexglm::to_ivec3(source.get_size(), 1));
 }
 
 
@@ -236,9 +237,9 @@ inline void FFFT2::step(T& source, T& target, size_t radix, fft_dimension dimens
 	}
 
 	if (
-		(dimension == x && to_ivec3(source.get_size(), 1).x % radix != 0) ||
-		(dimension == y && to_ivec3(source.get_size(), 1).y % radix != 0) ||
-		(dimension == z && to_ivec3(source.get_size(), 1).z % radix != 0)
+		(dimension == x && cortexglm::to_ivec3(source.get_size(), 1).x % radix != 0) ||
+		(dimension == y && cortexglm::to_ivec3(source.get_size(), 1).y % radix != 0) ||
+		(dimension == z && cortexglm::to_ivec3(source.get_size(), 1).z % radix != 0)
 		) {
 		ASSERT(false);
 	}
@@ -264,10 +265,10 @@ inline void FFFT2::step(T& source, T& target, size_t radix, fft_dimension dimens
 	kernel.update_uniform_as_image("fft_source_texture", source, 0);
 	kernel.update_uniform_as_image("fft_target_texture", target, 0);
 
-	kernel.update_uniform("fft_texture_resolution", to_ivec3(source.get_size(), 1));
+	kernel.update_uniform("fft_texture_resolution", cortexglm::to_ivec3(source.get_size(), 1));
 	kernel.update_uniform("group_count", group_count);
 
-	glm::ivec3 dispatch_size = to_ivec3(source.get_size(), 1);
+	glm::ivec3 dispatch_size = cortexglm::to_ivec3(source.get_size(), 1);
 	if (dimension == x) dispatch_size.x /= radix;
 	if (dimension == y) dispatch_size.y /= radix;
 	if (dimension == z) dispatch_size.z /= radix;
@@ -301,9 +302,9 @@ inline void FFFT2::dft(T& source, T& target, fft_dimension dimension, bool inver
 	}
 
 	if (
-		(dimension == x && to_ivec3(source.get_size(), 1).x < group_count.x) ||
-		(dimension == y && to_ivec3(source.get_size(), 1).y < group_count.y) ||
-		(dimension == z && to_ivec3(source.get_size(), 1).z < group_count.z)
+		(dimension == x && cortexglm::to_ivec3(source.get_size(), 1).x < group_count.x) ||
+		(dimension == y && cortexglm::to_ivec3(source.get_size(), 1).y < group_count.y) ||
+		(dimension == z && cortexglm::to_ivec3(source.get_size(), 1).z < group_count.z)
 		) {
 		std::cout << "[FFFT Error] FFFT::dft() is called but group_count exceeds the texture resolution" << std::endl;
 		ASSERT(false);
@@ -329,15 +330,15 @@ inline void FFFT2::dft(T& source, T& target, fft_dimension dimension, bool inver
 	kernel.update_uniform_as_image("fft_source_texture", source, 0);
 	kernel.update_uniform_as_image("fft_target_texture", target, 0);
 
-	kernel.update_uniform("fft_texture_resolution", to_ivec3(source.get_size(), 1));
+	kernel.update_uniform("fft_texture_resolution", cortexglm::to_ivec3(source.get_size(), 1));
 	kernel.update_uniform("group_count", group_count);
 
-	kernel.dispatch_thread(to_ivec3(source.get_size(), 1));
+	kernel.dispatch_thread(cortexglm::to_ivec3(source.get_size(), 1));
 
 	float divisor =
-		dimension == x ? glm::sqrt(to_ivec3(target.get_size(), 1).x) :
-		dimension == y ? glm::sqrt(to_ivec3(target.get_size(), 1).y) :
-		dimension == z ? glm::sqrt(to_ivec3(target.get_size(), 1).z) : 1;
+		dimension == x ? glm::sqrt(cortexglm::to_ivec3(target.get_size(), 1).x) :
+		dimension == y ? glm::sqrt(cortexglm::to_ivec3(target.get_size(), 1).y) :
+		dimension == z ? glm::sqrt(cortexglm::to_ivec3(target.get_size(), 1).z) : 1;
 
 	//divide(target, glm::vec2(divisor));
 }
@@ -370,12 +371,12 @@ inline void FFFT2::copy(T& source, T& target, component comp, glm::ivec3 source_
 	if (is_real(source) && is_real(target) && comp == complex)
 		return;
 	
-	if (size.x == 0) size.x = glm::min(to_ivec3(source.get_size(), 1).x - source_offset.x, to_ivec3(target.get_size(), 1).x - target_offset.x);
-	if (size.y == 0) size.y = glm::min(to_ivec3(source.get_size(), 1).y - source_offset.y, to_ivec3(target.get_size(), 1).y - target_offset.y);
-	if (size.z == 0) size.z = glm::min(to_ivec3(source.get_size(), 1).z - source_offset.z, to_ivec3(target.get_size(), 1).z - target_offset.z);
+	if (size.x == 0) size.x = glm::min(cortexglm::to_ivec3(source.get_size(), 1).x - source_offset.x, cortexglm::to_ivec3(target.get_size(), 1).x - target_offset.x);
+	if (size.y == 0) size.y = glm::min(cortexglm::to_ivec3(source.get_size(), 1).y - source_offset.y, cortexglm::to_ivec3(target.get_size(), 1).y - target_offset.y);
+	if (size.z == 0) size.z = glm::min(cortexglm::to_ivec3(source.get_size(), 1).z - source_offset.z, cortexglm::to_ivec3(target.get_size(), 1).z - target_offset.z);
 
-	bool source_overflow = glm::any(glm::greaterThan(source_offset + size, to_ivec3(source.get_size(), 1)));
-	bool target_overflow = glm::any(glm::greaterThan(target_offset + size, to_ivec3(target.get_size(), 1)));
+	bool source_overflow = glm::any(glm::greaterThan(source_offset + size, cortexglm::to_ivec3(source.get_size(), 1)));
+	bool target_overflow = glm::any(glm::greaterThan(target_offset + size, cortexglm::to_ivec3(target.get_size(), 1)));
 
 	if (source_overflow || target_overflow) {
 		std::cout << "[FFFT Error] FFFT::copy() is called but specified offset and size exceeds data size" << std::endl;
@@ -398,8 +399,8 @@ inline void FFFT2::copy(T& source, T& target, component comp, glm::ivec3 source_
 	kernel.update_uniform_as_image("fft_source_texture", source, 0);
 	kernel.update_uniform_as_image("fft_target_texture", target, 0);
 
-	kernel.update_uniform("fft_source_texture_resolution", to_ivec3(source.get_size(), 1));
-	kernel.update_uniform("fft_target_texture_resolution", to_ivec3(target.get_size(), 1));
+	kernel.update_uniform("fft_source_texture_resolution", cortexglm::to_ivec3(source.get_size(), 1));
+	kernel.update_uniform("fft_target_texture_resolution", cortexglm::to_ivec3(target.get_size(), 1));
 
 	kernel.update_uniform("fft_texture_source_offset", source_offset);
 	kernel.update_uniform("fft_texture_target_offset", target_offset);
@@ -418,9 +419,9 @@ inline std::shared_ptr<T> FFFT2::create(T& source, component comp, glm::ivec3 si
 	if (comp == complex)		format = complex_texture_format(format);
 	if (comp == real_complex)	format = complex_texture_format(format);
 
-	if (size.x <= 0) size.x = to_ivec3(source.get_size()).x;
-	if (size.y <= 0) size.y = to_ivec3(source.get_size()).y;
-	if (size.z <= 0) size.z = to_ivec3(source.get_size()).z;
+	if (size.x <= 0) size.x = cortexglm::to_ivec3(source.get_size()).x;
+	if (size.y <= 0) size.y = cortexglm::to_ivec3(source.get_size()).y;
+	if (size.z <= 0) size.z = cortexglm::to_ivec3(source.get_size()).z;
 
 	return create_texture_glm<T>(size, format);
 }
@@ -448,13 +449,13 @@ inline void FFFT2::pad(T& source, T& target, glm::ivec3 offset, glm::vec2 paddin
 		ASSERT(false);
 	}
 
-	if (glm::any(glm::greaterThan(to_ivec3(source.get_size()) + offset, to_ivec3(target.get_size())))) {
+	if (glm::any(glm::greaterThan(cortexglm::to_ivec3(source.get_size()) + offset, cortexglm::to_ivec3(target.get_size())))) {
 		std::cout << "[FFFT Error] FFFT::pad() is called but specified offset + source's size exceeds target's size" << std::endl;
 		ASSERT(false);
 	}
 
-	clear_texture_glm(target, glm::ivec3(0), to_ivec3(target.get_size()), glm::vec4(padding_value, 0, 1));
-	copy(source, target, FFFT2::real_complex, glm::ivec3(0), offset, to_ivec3(source.get_size()));
+	clear_texture_glm(target, glm::ivec3(0), cortexglm::to_ivec3(target.get_size()), glm::vec4(padding_value, 0, 1));
+	copy(source, target, FFFT2::real_complex, glm::ivec3(0), offset, cortexglm::to_ivec3(source.get_size()));
 }
 
 template<typename T>
@@ -467,12 +468,12 @@ inline void FFFT2::i_pad(T& source, T& target, glm::ivec3 offset)
 		ASSERT(false);
 	}
 
-	if (glm::any(glm::greaterThan(to_ivec3(target.get_size()) + offset, to_ivec3(source.get_size())))) {
+	if (glm::any(glm::greaterThan(cortexglm::to_ivec3(target.get_size()) + offset, cortexglm::to_ivec3(source.get_size())))) {
 		std::cout << "[FFFT Error] FFFT::i_pad() is called but specified offset + target's size exceeds source's size" << std::endl;
 		ASSERT(false);
 	}
 
-	copy(source, target, FFFT2::real_complex, offset, glm::ivec3(0), to_ivec3(target.get_size()));
+	copy(source, target, FFFT2::real_complex, offset, glm::ivec3(0), cortexglm::to_ivec3(target.get_size()));
 }
 
 template<typename T>
@@ -485,7 +486,7 @@ inline std::shared_ptr<T> FFFT2::pad(T& source, glm::ivec3 padded_size, glm::ive
 		ASSERT(false);
 	}
 	
-	if (glm::any(glm::lessThan(padded_size - offset, to_ivec3(source.get_size())))) {
+	if (glm::any(glm::lessThan(padded_size - offset, cortexglm::to_ivec3(source.get_size())))) {
 		std::cout << "[FFFT Error] FFFT::pad() is called with invalid padded_size and offset values" << std::endl;
 		ASSERT(false);
 	}
@@ -556,7 +557,7 @@ inline void FFFT2::shift(T& source, T& target, glm::ivec3 shift_amount)
 
 	ComputeProgram& kernel = *cp_shift.get_current_variant();
 
-	glm::ivec3 total_size = to_ivec3(source.get_size(), 1);
+	glm::ivec3 total_size = cortexglm::to_ivec3(source.get_size(), 1);
 
 	kernel.update_uniform_as_image("fft_source_texture", source, 0);
 	kernel.update_uniform_as_image("fft_target_texture", target, 0);
@@ -580,9 +581,9 @@ template<typename T>
 inline void FFFT2::shift(T& source, T& target, fft_dimension dimension)
 {
 	glm::ivec3 shift_amount = glm::ivec3(0);
-	if (dimension & x) shift_amount.x = to_ivec3(source.get_size(), 1).x / 2;
-	if (dimension & y) shift_amount.y = to_ivec3(source.get_size(), 1).y / 2;
-	if (dimension & z) shift_amount.z = to_ivec3(source.get_size(), 1).z / 2;
+	if (dimension & x) shift_amount.x = cortexglm::to_ivec3(source.get_size(), 1).x / 2;
+	if (dimension & y) shift_amount.y = cortexglm::to_ivec3(source.get_size(), 1).y / 2;
+	if (dimension & z) shift_amount.z = cortexglm::to_ivec3(source.get_size(), 1).z / 2;
 	shift(source, target, shift_amount);
 }
 
@@ -590,9 +591,9 @@ template<typename T>
 inline std::shared_ptr<T> FFFT2::shift(T& source, fft_dimension dimension)
 {
 	glm::ivec3 shift_amount = glm::ivec3(0);
-	if (dimension & x) shift_amount.x = to_ivec3(source.get_size(), 1).x / 2;
-	if (dimension & y) shift_amount.y = to_ivec3(source.get_size(), 1).y / 2;
-	if (dimension & z) shift_amount.z = to_ivec3(source.get_size(), 1).z / 2;
+	if (dimension & x) shift_amount.x = cortexglm::to_ivec3(source.get_size(), 1).x / 2;
+	if (dimension & y) shift_amount.y = cortexglm::to_ivec3(source.get_size(), 1).y / 2;
+	if (dimension & z) shift_amount.z = cortexglm::to_ivec3(source.get_size(), 1).z / 2;
 	return shift(source, shift_amount);
 }
 
@@ -616,9 +617,9 @@ template<typename T>
 inline void FFFT2::i_shift(T& source, T& target, fft_dimension dimension)
 {
 	glm::ivec3 shift_amount = glm::ivec3(0);
-	if (dimension & x) shift_amount.x = to_ivec3(source.get_size(), 1).x / 2;
-	if (dimension & y) shift_amount.y = to_ivec3(source.get_size(), 1).y / 2;
-	if (dimension & z) shift_amount.z = to_ivec3(source.get_size(), 1).z / 2;
+	if (dimension & x) shift_amount.x = cortexglm::to_ivec3(source.get_size(), 1).x / 2;
+	if (dimension & y) shift_amount.y = cortexglm::to_ivec3(source.get_size(), 1).y / 2;
+	if (dimension & z) shift_amount.z = cortexglm::to_ivec3(source.get_size(), 1).z / 2;
 	shift(source, target, -shift_amount);
 }
 
@@ -626,9 +627,9 @@ template<typename T>
 inline std::shared_ptr<T> FFFT2::i_shift(T& source, fft_dimension dimension)
 {
 	glm::ivec3 shift_amount = glm::ivec3(0);
-	if (dimension & x) shift_amount.x = to_ivec3(source.get_size(), 1).x / 2;
-	if (dimension & y) shift_amount.y = to_ivec3(source.get_size(), 1).y / 2;
-	if (dimension & z) shift_amount.z = to_ivec3(source.get_size(), 1).z / 2;
+	if (dimension & x) shift_amount.x = cortexglm::to_ivec3(source.get_size(), 1).x / 2;
+	if (dimension & y) shift_amount.y = cortexglm::to_ivec3(source.get_size(), 1).y / 2;
+	if (dimension & z) shift_amount.z = cortexglm::to_ivec3(source.get_size(), 1).z / 2;
 	return shift(source, -shift_amount);
 
 }
@@ -642,9 +643,9 @@ void FFFT2::mixed_fft(T& source, T& target, fft_dimension dimension, size_t max_
 	}
 
 	size_t array_size =
-		dimension == x ? to_ivec3(source.get_size()).x :
-		dimension == y ? to_ivec3(source.get_size()).y :
-		dimension == z ? to_ivec3(source.get_size()).z : to_ivec3(source.get_size()).x;
+		dimension == x ? cortexglm::to_ivec3(source.get_size()).x :
+		dimension == y ? cortexglm::to_ivec3(source.get_size()).y :
+		dimension == z ? cortexglm::to_ivec3(source.get_size()).z : cortexglm::to_ivec3(source.get_size()).x;
 
 	max_radix = std::max(max_radix, (size_t)1);
 
